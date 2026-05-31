@@ -1,0 +1,5762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FinCommand — Personal Financial Command Center</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    html,body,#root{margin:0;padding:0;height:100%;width:100%}
+    body{overflow:hidden}
+    input[type=range]{cursor:pointer;accent-color:#2d5a8e}
+    select,input,button{font-family:'DM Sans',system-ui,sans-serif;outline:none}
+    select:focus,input:focus{outline:1px solid #2d5a8e}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:#f0f4f8}
+    ::-webkit-scrollbar-thumb{background:#c0ccd8;border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:#a0b0c0}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <script>
+const { useState, useEffect, useCallback, useRef } = React;
+const { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, ReferenceLine, ComposedChart } = Recharts;
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const ML = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const CLASSIFICATIONS = ["Income", "Savings", "Necessity", "Discretionary", "Protection"];
+const TYPES = ["Income", "Savings", "Expense"];
+const FREQS = ["Monthly", "Annual", "Quarterly", "One-Time"];
+const PC = ["#2d5a8e", "#1a6e42", "#c47f00", "#a33a3a", "#0f6e56", "#6a5a9e", "#2a7a8a", "#7a5c9e"];
+const CM = 4;
+const fmt = n => {
+  if (!n && n !== 0) return "$0";
+  const a = Math.abs(n),
+    s = n < 0 ? "-" : "";
+  if (a >= 1000000) return `${s}$${(a / 1000000).toFixed(1)}M`;
+  if (a >= 1000) return `${s}$${Math.round(a / 1000)}K`;
+  return `${s}$${Math.round(a)}`;
+};
+const ff = n => !n && n !== 0 ? "$0" : (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString();
+const fp = (n, d = 1) => `${n >= 0 ? "+" : ""}${Number(n).toFixed(d)}%`;
+const ts = () => new Date().toLocaleString();
+const DB = [{
+  id: 1,
+  type: "Income",
+  category: "Salary",
+  description: "Primary salary",
+  classification: "Income",
+  fixed: "Fixed",
+  frequency: "Monthly",
+  months: {
+    JAN: 12500,
+    FEB: 12500,
+    MAR: 12500,
+    APR: 12500,
+    MAY: 12500,
+    JUN: 12500,
+    JUL: 12500,
+    AUG: 12500,
+    SEP: 12500,
+    OCT: 12500,
+    NOV: 12500,
+    DEC: 12500
+  }
+}, {
+  id: 2,
+  type: "Income",
+  category: "Bonus",
+  description: "Annual bonus",
+  classification: "Income",
+  fixed: "Variable",
+  frequency: "Annual",
+  months: {
+    JAN: 0,
+    FEB: 0,
+    MAR: 0,
+    APR: 0,
+    MAY: 0,
+    JUN: 0,
+    JUL: 0,
+    AUG: 0,
+    SEP: 0,
+    OCT: 0,
+    NOV: 0,
+    DEC: 15000
+  }
+}, {
+  id: 3,
+  type: "Savings",
+  category: "401k",
+  description: "Employer 401k",
+  classification: "Savings",
+  fixed: "Fixed",
+  frequency: "Monthly",
+  months: {
+    JAN: 1500,
+    FEB: 1500,
+    MAR: 1500,
+    APR: 1500,
+    MAY: 1500,
+    JUN: 1500,
+    JUL: 1500,
+    AUG: 1500,
+    SEP: 1500,
+    OCT: 1500,
+    NOV: 1500,
+    DEC: 1500
+  }
+}, {
+  id: 4,
+  type: "Savings",
+  category: "Brokerage",
+  description: "Taxable savings",
+  classification: "Savings",
+  fixed: "Fixed",
+  frequency: "Monthly",
+  months: {
+    JAN: 500,
+    FEB: 500,
+    MAR: 500,
+    APR: 500,
+    MAY: 500,
+    JUN: 500,
+    JUL: 500,
+    AUG: 500,
+    SEP: 500,
+    OCT: 500,
+    NOV: 500,
+    DEC: 500
+  }
+}, {
+  id: 5,
+  type: "Expense",
+  category: "Mortgage",
+  description: "Home mortgage",
+  classification: "Necessity",
+  fixed: "Fixed",
+  frequency: "Monthly",
+  months: {
+    JAN: 2200,
+    FEB: 2200,
+    MAR: 2200,
+    APR: 2200,
+    MAY: 2200,
+    JUN: 2200,
+    JUL: 2200,
+    AUG: 2200,
+    SEP: 2200,
+    OCT: 2200,
+    NOV: 2200,
+    DEC: 2200
+  }
+}, {
+  id: 6,
+  type: "Expense",
+  category: "Utilities",
+  description: "Electricity/gas/water",
+  classification: "Necessity",
+  fixed: "Variable",
+  frequency: "Monthly",
+  months: {
+    JAN: 320,
+    FEB: 290,
+    MAR: 240,
+    APR: 180,
+    MAY: 160,
+    JUN: 200,
+    JUL: 260,
+    AUG: 280,
+    SEP: 220,
+    OCT: 190,
+    NOV: 250,
+    DEC: 310
+  }
+}, {
+  id: 7,
+  type: "Expense",
+  category: "Groceries",
+  description: "Food & household",
+  classification: "Necessity",
+  fixed: "Variable",
+  frequency: "Monthly",
+  months: {
+    JAN: 800,
+    FEB: 800,
+    MAR: 800,
+    APR: 800,
+    MAY: 800,
+    JUN: 800,
+    JUL: 800,
+    AUG: 800,
+    SEP: 800,
+    OCT: 800,
+    NOV: 800,
+    DEC: 900
+  }
+}, {
+  id: 8,
+  type: "Expense",
+  category: "Insurance",
+  description: "Health/life/home",
+  classification: "Protection",
+  fixed: "Fixed",
+  frequency: "Monthly",
+  months: {
+    JAN: 480,
+    FEB: 480,
+    MAR: 480,
+    APR: 480,
+    MAY: 480,
+    JUN: 480,
+    JUL: 480,
+    AUG: 480,
+    SEP: 480,
+    OCT: 480,
+    NOV: 480,
+    DEC: 480
+  }
+}, {
+  id: 9,
+  type: "Expense",
+  category: "Dining",
+  description: "Restaurants & takeout",
+  classification: "Discretionary",
+  fixed: "Variable",
+  frequency: "Monthly",
+  months: {
+    JAN: 400,
+    FEB: 350,
+    MAR: 420,
+    APR: 380,
+    MAY: 410,
+    JUN: 450,
+    JUL: 430,
+    AUG: 400,
+    SEP: 390,
+    OCT: 370,
+    NOV: 480,
+    DEC: 550
+  }
+}, {
+  id: 10,
+  type: "Expense",
+  category: "Entertainment",
+  description: "Subscriptions & leisure",
+  classification: "Discretionary",
+  fixed: "Variable",
+  frequency: "Monthly",
+  months: {
+    JAN: 250,
+    FEB: 220,
+    MAR: 260,
+    APR: 240,
+    MAY: 270,
+    JUN: 300,
+    JUL: 320,
+    AUG: 290,
+    SEP: 260,
+    OCT: 240,
+    NOV: 280,
+    DEC: 400
+  }
+}, {
+  id: 11,
+  type: "Expense",
+  category: "Travel",
+  description: "Vacations & trips",
+  classification: "Discretionary",
+  fixed: "Variable",
+  frequency: "Quarterly",
+  months: {
+    JAN: 0,
+    FEB: 0,
+    MAR: 1200,
+    APR: 0,
+    MAY: 0,
+    JUN: 2500,
+    JUL: 0,
+    AUG: 0,
+    SEP: 1800,
+    OCT: 0,
+    NOV: 0,
+    DEC: 1500
+  }
+}, {
+  id: 12,
+  type: "Expense",
+  category: "Personal",
+  description: "Clothing & personal care",
+  classification: "Discretionary",
+  fixed: "Variable",
+  frequency: "Monthly",
+  months: {
+    JAN: 300,
+    FEB: 280,
+    MAR: 350,
+    APR: 320,
+    MAY: 300,
+    JUN: 380,
+    JUL: 340,
+    AUG: 310,
+    SEP: 290,
+    OCT: 330,
+    NOV: 400,
+    DEC: 600
+  }
+}];
+const DA = DB.map(r => ({
+  ...r,
+  id: r.id + 1000,
+  months: Object.fromEntries(MONTHS.map(m => [m, Math.round((r.months[m] || 0) * (0.88 + Math.random() * 0.24))]))
+}));
+const DI = [{
+  id: 1,
+  institution: "Fidelity",
+  accountType: "401k",
+  accountName: "Employer 401k",
+  taxTreatment: "Pre-Tax",
+  assetType: "Equity",
+  balance: 285000,
+  contribution: 1500,
+  growthRate: 7.5
+}, {
+  id: 2,
+  institution: "Fidelity",
+  accountType: "Roth IRA",
+  accountName: "Personal Roth",
+  taxTreatment: "Roth",
+  assetType: "Equity",
+  balance: 68000,
+  contribution: 583,
+  growthRate: 7.5
+}, {
+  id: 3,
+  institution: "Schwab",
+  accountType: "Brokerage",
+  accountName: "Taxable Account",
+  taxTreatment: "Taxable",
+  assetType: "Equity",
+  balance: 124000,
+  contribution: 500,
+  growthRate: 7.0
+}, {
+  id: 4,
+  institution: "Optum",
+  accountType: "HSA",
+  accountName: "Health Savings",
+  taxTreatment: "Tax-Free",
+  assetType: "Conservative",
+  balance: 14200,
+  contribution: 300,
+  growthRate: 5.0
+}, {
+  id: 5,
+  institution: "Preferred Trust",
+  accountType: "Self-Directed",
+  accountName: "Alternative Investments",
+  taxTreatment: "Taxable",
+  assetType: "Alternative",
+  balance: 42000,
+  contribution: 0,
+  growthRate: 9.0
+}, {
+  id: 6,
+  institution: "Cash",
+  accountType: "HYSA",
+  accountName: "High Yield Savings",
+  taxTreatment: "Taxable",
+  assetType: "Cash",
+  balance: 38000,
+  contribution: 0,
+  growthRate: 4.8
+}];
+const DNW = {
+  assets: [{
+    id: 1,
+    name: "Primary Residence",
+    category: "Real Estate",
+    value: 485000,
+    note: "Purchased 2019"
+  }, {
+    id: 2,
+    name: "Investment Portfolio",
+    category: "Investments",
+    value: 571200,
+    note: "See Investments tab"
+  }, {
+    id: 3,
+    name: "Vehicle",
+    category: "Personal Property",
+    value: 28000,
+    note: "2022 Honda"
+  }, {
+    id: 4,
+    name: "Cash & Checking",
+    category: "Liquid",
+    value: 22000,
+    note: "Operating accounts"
+  }],
+  liabilities: [{
+    id: 1,
+    name: "Mortgage",
+    category: "Real Estate",
+    balance: 312000,
+    rate: 3.25,
+    originalBalance: 380000,
+    monthlyPayment: 2200,
+    termYears: 30
+  }, {
+    id: 2,
+    name: "Auto Loan",
+    category: "Vehicle",
+    balance: 14500,
+    rate: 4.9,
+    originalBalance: 28000,
+    monthlyPayment: 520,
+    termYears: 5
+  }],
+  history: [{
+    month: "Jan 2024",
+    netWorth: 510000
+  }, {
+    month: "Feb 2024",
+    netWorth: 518000
+  }, {
+    month: "Mar 2024",
+    netWorth: 524000
+  }, {
+    month: "Apr 2024",
+    netWorth: 531000
+  }, {
+    month: "May 2024",
+    netWorth: 545000
+  }, {
+    month: "Jun 2024",
+    netWorth: 539000
+  }, {
+    month: "Jul 2024",
+    netWorth: 552000
+  }, {
+    month: "Aug 2024",
+    netWorth: 558000
+  }, {
+    month: "Sep 2024",
+    netWorth: 562000
+  }, {
+    month: "Oct 2024",
+    netWorth: 571000
+  }, {
+    month: "Nov 2024",
+    netWorth: 578000
+  }, {
+    month: "Dec 2024",
+    netWorth: 589000
+  }, {
+    month: "Jan 2025",
+    netWorth: 594000
+  }, {
+    month: "Feb 2025",
+    netWorth: 601000
+  }, {
+    month: "Mar 2025",
+    netWorth: 608000
+  }, {
+    month: "Apr 2025",
+    netWorth: 615000
+  }, {
+    month: "May 2025",
+    netWorth: 779200
+  }]
+};
+const DT = {
+  savingsRate: 20,
+  emergencyFundMonths: 6,
+  maxDiscretionary: 2000,
+  retirementContribPct: 15
+};
+const DR = {
+  currentAge: 42,
+  retirementAge: 62,
+  socialSecurity: 2800,
+  monthlySpending: 9500,
+  expectedReturn: 7.5,
+  inflation: 3.0
+};
+function useLS(key, init) {
+  const [val, setVal] = useState(() => {
+    try {
+      const s = localStorage.getItem(key);
+      return s ? JSON.parse(s) : init;
+    } catch {
+      return init;
+    }
+  });
+  const save = useCallback(v => {
+    setVal(v);
+    try {
+      localStorage.setItem(key, JSON.stringify(v));
+    } catch {}
+  }, [key]);
+  return [val, save];
+}
+function useAuditLog() {
+  const [log, setLog] = useLS("fincc_audit_v2", []);
+  const add = useCallback((module, field, oldVal, newVal, description) => {
+    setLog(prev => [{
+      id: Date.now(),
+      timestamp: ts(),
+      module,
+      field,
+      oldVal: String(oldVal),
+      newVal: String(newVal),
+      description
+    }, ...prev].slice(0, 300));
+  }, [setLog]);
+  return [log, add, () => setLog([])];
+}
+const C = {
+  navy: "#1a2e4a",
+  blue: "#2d5a8e",
+  blueLight: "#e8f0f9",
+  blueMid: "#5a82b4",
+  green: "#1a6e42",
+  greenLight: "#e8f5ee",
+  greenMid: "#4a9e72",
+  marigold: "#c47f00",
+  marigoldLight: "#fdf3e0",
+  marigoldMid: "#e09a20",
+  red: "#a33a3a",
+  redLight: "#faeaea",
+  redMid: "#c45a5a",
+  teal: "#0f6e56",
+  tealLight: "#e4f4f0",
+  purple: "#6a5a9e",
+  purpleLight: "#f0eefb",
+  bg: "#f0f4f8",
+  surface: "#ffffff",
+  card: "#ffffff",
+  border: "#d0dce8",
+  borderLight: "#e8eef5",
+  text: "#1a2e4a",
+  textMid: "#4a6080",
+  textMuted: "#7a90a8",
+  textLight: "#a8bcd0"
+};
+const S = {
+  app: {
+    display: "flex",
+    flexDirection: "column",
+    height: "100vh",
+    background: C.bg,
+    color: C.text,
+    fontFamily: "'DM Sans','Segoe UI',system-ui,sans-serif",
+    fontSize: "13px"
+  },
+  nav: {
+    display: "flex",
+    alignItems: "center",
+    gap: "2px",
+    padding: "0 14px",
+    borderBottom: `1px solid ${C.border}`,
+    background: C.navy,
+    height: "48px",
+    flexShrink: 0,
+    overflowX: "auto"
+  },
+  navTitle: {
+    fontSize: "14px",
+    fontWeight: "700",
+    color: "#ffffff",
+    marginRight: "10px",
+    letterSpacing: "-0.3px",
+    whiteSpace: "nowrap"
+  },
+  navBtn: a => ({
+    padding: "4px 10px",
+    borderRadius: "6px",
+    border: "none",
+    background: a ? C.blue : "transparent",
+    color: a ? "#ffffff" : "#8aaac8",
+    cursor: "pointer",
+    fontSize: "11px",
+    fontWeight: "500",
+    whiteSpace: "nowrap"
+  }),
+  content: {
+    flex: 1,
+    overflow: "auto",
+    padding: "14px 18px"
+  },
+  grid: (cols, gap = 12) => ({
+    display: "grid",
+    gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`,
+    gap: `${gap}px`
+  }),
+  card: {
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    borderRadius: "10px",
+    padding: "14px 16px"
+  },
+  kpiVal: {
+    fontSize: "20px",
+    fontWeight: "700",
+    lineHeight: 1.1,
+    marginTop: "4px"
+  },
+  kpiLbl: {
+    fontSize: "10px",
+    color: C.textMuted,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px"
+  },
+  kpiSub: p => ({
+    fontSize: "10px",
+    color: p ? C.green : C.red,
+    marginTop: "2px"
+  }),
+  secTitle: {
+    fontSize: "10px",
+    fontWeight: "700",
+    color: C.textMuted,
+    marginBottom: "10px",
+    textTransform: "uppercase",
+    letterSpacing: "0.6px"
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse"
+  },
+  th: {
+    padding: "6px 9px",
+    fontSize: "10px",
+    fontWeight: "700",
+    color: C.textMuted,
+    textAlign: "left",
+    borderBottom: `1px solid ${C.border}`,
+    textTransform: "uppercase",
+    letterSpacing: "0.4px",
+    whiteSpace: "nowrap"
+  },
+  td: {
+    padding: "5px 9px",
+    fontSize: "12px",
+    borderBottom: `1px solid ${C.borderLight}`,
+    color: C.text
+  },
+  inp: {
+    background: "#f8fafc",
+    border: `1px solid ${C.border}`,
+    borderRadius: "6px",
+    color: C.text,
+    padding: "3px 7px",
+    fontSize: "12px",
+    width: "100%",
+    boxSizing: "border-box"
+  },
+  ni: {
+    background: "transparent",
+    border: "none",
+    color: C.text,
+    padding: "2px 3px",
+    fontSize: "12px",
+    width: "72px",
+    textAlign: "right"
+  },
+  sel: {
+    background: "#f8fafc",
+    border: `1px solid ${C.border}`,
+    borderRadius: "6px",
+    color: C.text,
+    padding: "3px 6px",
+    fontSize: "11px"
+  },
+  btn: {
+    padding: "4px 11px",
+    borderRadius: "6px",
+    border: `1px solid ${C.border}`,
+    background: C.surface,
+    color: C.textMid,
+    cursor: "pointer",
+    fontSize: "11px",
+    fontWeight: "500"
+  },
+  btnP: {
+    padding: "4px 11px",
+    borderRadius: "6px",
+    border: "none",
+    background: C.blue,
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: "11px",
+    fontWeight: "600"
+  },
+  btnD: {
+    padding: "3px 6px",
+    borderRadius: "5px",
+    border: "none",
+    background: "transparent",
+    color: C.red,
+    cursor: "pointer",
+    fontSize: "11px"
+  },
+  badge: c => ({
+    display: "inline-block",
+    padding: "1px 6px",
+    borderRadius: "4px",
+    fontSize: "10px",
+    fontWeight: "600",
+    background: c + "18",
+    color: c
+  })
+};
+const TT = {
+  contentStyle: {
+    background: C.surface,
+    border: `1px solid ${C.border}`,
+    borderRadius: "8px",
+    fontSize: "11px",
+    color: C.text
+  },
+  labelStyle: {
+    color: C.textMuted,
+    fontWeight: 600
+  }
+};
+function KPI({
+  label,
+  value,
+  sub,
+  color,
+  alert
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.card,
+      borderLeft: alert ? `3px solid ${alert}` : undefined,
+      padding: "10px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.kpiLbl
+  }, label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.kpiVal,
+      color: color || "#1a2e4a"
+    }
+  }, value), sub && /*#__PURE__*/React.createElement("div", {
+    style: S.kpiSub(sub.pos)
+  }, sub.pos ? "▲" : "▼", " ", sub.text));
+}
+function PBar({
+  value,
+  max,
+  color = "#2d5a8e",
+  label,
+  sub,
+  threshold
+}) {
+  const p = Math.min(100, value / max * 100),
+    over = threshold && value > threshold;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "11px",
+      marginBottom: "3px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: over ? "#a33a3a" : "#1a2e4a",
+      fontWeight: 600
+    }
+  }, sub)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "4px",
+      borderRadius: "3px",
+      background: "#f8fafc"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "100%",
+      width: `${p}%`,
+      background: over ? "#a33a3a" : color,
+      borderRadius: "3px"
+    }
+  })));
+}
+function MoneyInput({
+  value,
+  onChange,
+  style,
+  step = 1
+}) {
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState(String(value));
+  useEffect(() => {
+    if (!focused) setRaw(String(value));
+  }, [value, focused]);
+  return /*#__PURE__*/React.createElement("input", {
+    type: focused ? "number" : "text",
+    style: style,
+    value: focused ? raw : Number(value).toLocaleString(),
+    step: step,
+    onFocus: () => {
+      setFocused(true);
+      setRaw(String(value));
+    },
+    onBlur: () => {
+      setFocused(false);
+      const n = Number(raw);
+      if (!isNaN(n)) onChange(n);
+    },
+    onChange: e => {
+      setRaw(e.target.value);
+      const n = Number(e.target.value);
+      if (!isNaN(n)) onChange(n);
+    }
+  });
+}
+function computeMonthly(rows) {
+  return MONTHS.map((m, i) => {
+    const income = rows.filter(r => r.type === "Income").reduce((s, r) => s + (Number(r.months[m]) || 0), 0);
+    const savings = rows.filter(r => r.type === "Savings").reduce((s, r) => s + (Number(r.months[m]) || 0), 0);
+    const expenses = rows.filter(r => r.type === "Expense").reduce((s, r) => s + (Number(r.months[m]) || 0), 0);
+    return {
+      month: ML[i],
+      income,
+      savings,
+      expenses,
+      netCash: income - savings - expenses
+    };
+  });
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────
+function OverviewModule({
+  budget,
+  actuals,
+  netWorthData,
+  targets,
+  investments
+}) {
+  const [tm, setTm] = useState("all");
+  const bM = computeMonthly(budget),
+    aM = computeMonthly(actuals);
+  const cur = aM[CM],
+    bCur = bM[CM];
+  const ytdS = aM.slice(0, CM + 1).reduce((s, m) => s + m.savings, 0);
+  const ytdI = aM.slice(0, CM + 1).reduce((s, m) => s + m.income, 0);
+  const planYTDS = bM.slice(0, CM + 1).reduce((s, m) => s + m.savings, 0);
+  const forecastS = Math.round(ytdS / (CM + 1) * 12);
+  const expVar = (cur.expenses - bCur.expenses) / bCur.expenses * 100;
+  const sr = ytdI > 0 ? ytdS / ytdI * 100 : 0;
+  const totalA = netWorthData.assets.reduce((s, a) => s + a.value, 0);
+  const totalL = netWorthData.liabilities.reduce((s, l) => s + l.balance, 0);
+  const nw = totalA - totalL;
+  const retA = investments.reduce((s, r) => s + (r.taxTreatment !== "Taxable" ? r.balance : 0), 0);
+  const fcast = [CM + 1, CM + 2, CM + 3].map(i => {
+    const mi = Math.min(i, 11);
+    return {
+      month: ML[mi],
+      income: bM[mi].income,
+      expenses: bM[mi].expenses,
+      netCash: bM[mi].netCash
+    };
+  });
+  const chartData = bM.map((b, i) => ({
+    month: b.month,
+    income: aM[i].income,
+    expenses: aM[i].expenses,
+    savings: aM[i].savings,
+    netCash: aM[i].netCash
+  }));
+  const discSpend = actuals.filter(r => r.classification === "Discretionary").reduce((s, r) => MONTHS.slice(0, CM + 1).reduce((ss, m) => ss + (Number(r.months[m]) || 0), s), 0);
+  const topCat = actuals.filter(r => r.type === "Expense").sort((a, b) => MONTHS.reduce((s, m) => s + (Number(b.months[m]) || 0), 0) - MONTHS.reduce((s, m) => s + (Number(a.months[m]) || 0), 0))[0];
+  const insights = [{
+    t: "opportunity",
+    txt: `Savings rate YTD: ${sr.toFixed(1)}% — ${sr >= targets.savingsRate ? `${(sr - targets.savingsRate).toFixed(1)}pp above` : `${(targets.savingsRate - sr).toFixed(1)}pp below`} the ${targets.savingsRate}% target.`
+  }, {
+    t: expVar > 5 ? "risk" : "info",
+    txt: `Expense variance: ${fp(expVar)} vs plan this month. ${expVar > 5 ? "Monitor discretionary categories." : "Within acceptable range."}`
+  }, {
+    t: "opportunity",
+    txt: `A 10% reduction in discretionary spending saves ~${ff(Math.round(discSpend * 0.10))} YTD and ~${ff(Math.round(discSpend / (CM + 1) * 12 * 0.10))} annualized.`
+  }, {
+    t: "info",
+    txt: `Retirement assets represent ${nw > 0 ? (retA / nw * 100).toFixed(0) : 0}% of net worth. ${retA > nw * 0.75 ? "Consider increasing taxable brokerage." : "Portfolio mix is balanced."}`
+  }, topCat ? {
+    t: "info",
+    txt: `Largest expense: ${topCat.category} at ${ff(MONTHS.reduce((s, m) => s + (Number(topCat.months[m]) || 0), 0))} annually.`
+  } : null].filter(Boolean);
+  const ic = {
+    opportunity: "#1a6e42",
+    info: "#2d5a8e",
+    risk: "#c47f00"
+  };
+  const snap = aM.map((m, i) => ({
+    ...m,
+    bNC: bM[i].netCash,
+    v: bM[i].netCash !== 0 ? (m.netCash - bM[i].netCash) / Math.abs(bM[i].netCash) * 100 : 0
+  }));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(6, 10)
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: "Month Net Cash",
+    value: ff(cur.netCash),
+    color: cur.netCash >= 0 ? "#1a6e42" : "#a33a3a",
+    sub: {
+      pos: cur.netCash >= bCur.netCash,
+      text: `${Math.abs((cur.netCash - bCur.netCash) / Math.max(1, Math.abs(bCur.netCash)) * 100).toFixed(1)}% vs plan`
+    }
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Expense Variance",
+    value: `${expVar >= 0 ? "+" : ""}${expVar.toFixed(1)}%`,
+    color: expVar <= 0 ? "#1a6e42" : "#c47f00",
+    alert: expVar > 10 ? "#c47f00" : undefined
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "YTD Savings",
+    value: ff(ytdS),
+    color: "#2d5a8e",
+    sub: {
+      pos: ytdS >= planYTDS,
+      text: `${Math.abs((ytdS - planYTDS) / Math.max(1, planYTDS) * 100).toFixed(1)}% vs plan`
+    }
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Forecast Annual Savings",
+    value: ff(forecastS),
+    color: "#6a5a9e"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Net Worth",
+    value: ff(nw),
+    color: "#1a6e42",
+    sub: {
+      pos: true,
+      text: "4.2% YTD"
+    }
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Retirement Assets",
+    value: ff(retA),
+    color: "#0f6e56",
+    sub: {
+      pos: true,
+      text: "6.8% YTD"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: S.grid(3, 12)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.card,
+      gridColumn: "1/3"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Annual Financial Trend"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "4px"
+    }
+  }, ["all", "income", "expenses", "savings", "netCash"].map(m => /*#__PURE__*/React.createElement("button", {
+    key: m,
+    onClick: () => setTm(m),
+    style: {
+      ...S.btn,
+      ...(tm === m ? {
+        background: "#2d5a8e",
+        color: "#ffffff",
+        border: "none"
+      } : {}),
+      padding: "3px 8px"
+    }
+  }, m === "all" ? "All" : m === "netCash" ? "Net Cash" : m.charAt(0).toUpperCase() + m.slice(1))))), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 180
+  }, /*#__PURE__*/React.createElement(AreaChart, {
+    data: chartData,
+    margin: {
+      top: 4,
+      right: 4,
+      bottom: 0,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement("defs", null, [["I", "#1a6e42"], ["E", "#c47f00"], ["S", "#2d5a8e"], ["N", "#6a5a9e"]].map(([k, c]) => /*#__PURE__*/React.createElement("linearGradient", {
+    key: k,
+    id: `gO${k}`,
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "5%",
+    stopColor: c,
+    stopOpacity: 0.15
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "95%",
+    stopColor: c,
+    stopOpacity: 0
+  })))), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "month",
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: (v, n) => [ff(v), n]
+  })), (tm === "all" || tm === "income") && /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "income",
+    stroke: "#1a6e42",
+    fill: "url(#gOI)",
+    strokeWidth: 2,
+    dot: false,
+    name: "Income"
+  }), (tm === "all" || tm === "expenses") && /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "expenses",
+    stroke: "#c47f00",
+    fill: "url(#gOE)",
+    strokeWidth: 2,
+    dot: false,
+    name: "Expenses"
+  }), (tm === "all" || tm === "savings") && /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "savings",
+    stroke: "#2d5a8e",
+    fill: "url(#gOS)",
+    strokeWidth: 2,
+    dot: false,
+    name: "Savings"
+  }), (tm === "all" || tm === "netCash") && /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "netCash",
+    stroke: "#6a5a9e",
+    fill: "url(#gON)",
+    strokeWidth: 2,
+    dot: false,
+    name: "Net Cash"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "14px",
+      marginTop: "5px"
+    }
+  }, [["Income", "#1a6e42"], ["Expenses", "#c47f00"], ["Savings", "#2d5a8e"], ["Net Cash", "#6a5a9e"]].map(([l, c]) => /*#__PURE__*/React.createElement("span", {
+    key: l,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: "10px",
+      height: "2px",
+      background: c,
+      display: "inline-block"
+    }
+  }), l)))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Insights"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "7px"
+    }
+  }, insights.map((ins, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      padding: "7px 9px",
+      background: "#f8fafc",
+      borderRadius: "6px",
+      borderLeft: `3px solid ${ic[ins.t]}`
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: "11px",
+      color: "#7a90a8",
+      lineHeight: 1.5
+    }
+  }, ins.txt)))))), /*#__PURE__*/React.createElement("div", {
+    style: S.grid(2, 12)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Monthly Snapshot"), /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ["Month", "Income", "Expenses", "Savings", "Net Cash", "vs Plan"].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: {
+      ...S.th,
+      textAlign: h === "Month" ? "left" : "right"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, snap.map((row, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: {
+      background: i === CM ? "#e8f0f9" : "transparent"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      fontWeight: i === CM ? 600 : 400,
+      color: i === CM ? "#5a82b4" : "#7a90a8"
+    }
+  }, row.month), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#1a6e42"
+    }
+  }, ff(row.income)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#c47f00"
+    }
+  }, ff(row.expenses)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#2d5a8e"
+    }
+  }, ff(row.savings)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: row.netCash >= 0 ? "#1a6e42" : "#a33a3a",
+      fontWeight: 600
+    }
+  }, ff(row.netCash)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: row.v >= 0 ? "#1a6e42" : "#a33a3a",
+      fontSize: "11px"
+    }
+  }, row.v >= 0 ? "+" : "", row.v.toFixed(1), "%"))))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "3-Month Cash Flow Forecast"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 140
+  }, /*#__PURE__*/React.createElement(BarChart, {
+    data: fcast,
+    margin: {
+      top: 4,
+      right: 4,
+      bottom: 0,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "month",
+    tick: {
+      fontSize: 11,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: (v, n) => [ff(v), n]
+  })), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "income",
+    fill: "#1a6e42",
+    radius: [3, 3, 0, 0],
+    name: "Income"
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "expenses",
+    fill: "#c47f00",
+    radius: [3, 3, 0, 0],
+    name: "Expenses"
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "netCash",
+    fill: "#2d5a8e",
+    radius: [3, 3, 0, 0],
+    name: "Net Cash"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Target Status"), /*#__PURE__*/React.createElement(PBar, {
+    label: "Savings Rate",
+    value: sr,
+    max: 30,
+    color: "#2d5a8e",
+    sub: `${sr.toFixed(1)}% / ${targets.savingsRate}% target`,
+    threshold: targets.savingsRate > sr ? 999 : 0
+  }), /*#__PURE__*/React.createElement(PBar, {
+    label: "Emergency Fund",
+    value: investments.filter(r => r.assetType === "Cash").reduce((s, r) => s + r.balance, 0) / Math.max(1, cur.expenses),
+    max: targets.emergencyFundMonths * 1.5,
+    color: "#0f6e56",
+    sub: `${(investments.filter(r => r.assetType === "Cash").reduce((s, r) => s + r.balance, 0) / Math.max(1, cur.expenses)).toFixed(1)}mo / ${targets.emergencyFundMonths}mo target`
+  })))));
+}
+
+// ── BUDGET / ACTUALS ──────────────────────────────────────────
+// ── BUDGET ROW (Budget Setup only — all fields editable) ──────
+function BRow({
+  row,
+  onUpdate,
+  onDelete,
+  audit
+}) {
+  const tc = {
+    Income: "#1a6e42",
+    Savings: "#2d5a8e",
+    Expense: "#c47f00"
+  };
+  const ann = MONTHS.reduce((s, m) => s + (Number(row.months[m]) || 0), 0);
+  return /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 5px"
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    style: {
+      ...S.sel,
+      width: "76px"
+    },
+    value: row.type,
+    onChange: e => {
+      audit("Budget", "Type", row.type, e.target.value, row.category);
+      onUpdate({
+        ...row,
+        type: e.target.value
+      });
+    }
+  }, TYPES.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t
+  }, t)))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 5px"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "105px"
+    },
+    value: row.category,
+    onChange: e => onUpdate({
+      ...row,
+      category: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 5px"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "140px"
+    },
+    value: row.description,
+    onChange: e => onUpdate({
+      ...row,
+      description: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 5px"
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    style: {
+      ...S.sel,
+      width: "105px"
+    },
+    value: row.classification,
+    onChange: e => onUpdate({
+      ...row,
+      classification: e.target.value
+    })
+  }, CLASSIFICATIONS.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c
+  }, c)))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 5px"
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    style: {
+      ...S.sel,
+      width: "74px"
+    },
+    value: row.fixed,
+    onChange: e => onUpdate({
+      ...row,
+      fixed: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", null, "Fixed"), /*#__PURE__*/React.createElement("option", null, "Variable"))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 5px"
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    style: {
+      ...S.sel,
+      width: "86px"
+    },
+    value: row.frequency,
+    onChange: e => onUpdate({
+      ...row,
+      frequency: e.target.value
+    })
+  }, FREQS.map(f => /*#__PURE__*/React.createElement("option", {
+    key: f
+  }, f)))), MONTHS.map(m => /*#__PURE__*/React.createElement("td", {
+    key: m,
+    style: {
+      padding: "2px 2px"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      ...S.ni,
+      width: "66px"
+    },
+    value: row.months[m] || 0,
+    onChange: e => {
+      const nv = Number(e.target.value);
+      if (nv !== (row.months[m] || 0)) audit("Budget", `${row.category}/${m}`, row.months[m] || 0, nv, row.category);
+      onUpdate({
+        ...row,
+        months: {
+          ...row.months,
+          [m]: nv
+        }
+      });
+    }
+  }))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 8px",
+      textAlign: "right",
+      fontSize: "12px",
+      fontWeight: 600,
+      color: tc[row.type] || "#1a2e4a",
+      whiteSpace: "nowrap"
+    }
+  }, ff(ann)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 4px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: S.btnD,
+    onClick: onDelete
+  }, "\u2715")));
+}
+
+// ── ACTUALS ROW (amounts only — metadata locked to budget) ─────
+function ARow({
+  budgetRow,
+  actualRow,
+  onUpdate,
+  audit
+}) {
+  const tc = {
+    Income: "#1a6e42",
+    Savings: "#2d5a8e",
+    Expense: "#c47f00"
+  };
+  const ann = MONTHS.reduce((s, m) => s + (Number(actualRow.months[m]) || 0), 0);
+  const bAnn = MONTHS.reduce((s, m) => s + (Number(budgetRow.months[m]) || 0), 0);
+  const variance = ann - bAnn;
+  const isFav = budgetRow.type === "Income" || budgetRow.type === "Savings" ? variance >= 0 : variance <= 0;
+  return /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 8px",
+      fontSize: "11px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: S.badge(tc[budgetRow.type] || "#7a90a8")
+  }, budgetRow.type)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 8px",
+      fontSize: "12px",
+      fontWeight: 600,
+      color: "#1a2e4a"
+    }
+  }, budgetRow.category), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 8px",
+      fontSize: "11px",
+      color: "#7a90a8"
+    }
+  }, budgetRow.description), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 8px",
+      fontSize: "11px",
+      color: "#7a90a8"
+    }
+  }, budgetRow.classification), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 8px",
+      fontSize: "11px",
+      color: "#7a90a8"
+    }
+  }, budgetRow.frequency), MONTHS.map(m => /*#__PURE__*/React.createElement("td", {
+    key: m,
+    style: {
+      padding: "2px 2px"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      ...S.ni,
+      width: "66px"
+    },
+    value: actualRow.months[m] || 0,
+    onChange: e => {
+      const nv = Number(e.target.value);
+      if (nv !== (actualRow.months[m] || 0)) audit("Actuals", `${budgetRow.category}/${m}`, actualRow.months[m] || 0, nv, budgetRow.category);
+      onUpdate({
+        ...actualRow,
+        months: {
+          ...actualRow.months,
+          [m]: nv
+        }
+      });
+    }
+  }))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 8px",
+      textAlign: "right",
+      fontSize: "12px",
+      fontWeight: 600,
+      color: tc[budgetRow.type] || "#1a2e4a",
+      whiteSpace: "nowrap"
+    }
+  }, ff(ann)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "3px 8px",
+      textAlign: "right",
+      fontSize: "11px",
+      color: isFav ? "#1a6e42" : "#a33a3a",
+      fontWeight: 600,
+      whiteSpace: "nowrap"
+    }
+  }, variance >= 0 ? "+" : "", ff(variance)));
+}
+
+// ── BUDGET MODULE (Budget Setup) ───────────────────────────────
+function BudgetModule({
+  rows,
+  setRows,
+  actuals,
+  setActuals,
+  audit
+}) {
+  const [filter, setFilter] = useState("All");
+  const [sortCol, setSortCol] = useState("type");
+  const [sortDir, setSortDir] = useState(1);
+  const toggleSort = col => {
+    if (sortCol === col) setSortDir(d => d * -1);else {
+      setSortCol(col);
+      setSortDir(1);
+    }
+  };
+  const newRow = () => {
+    const id = Date.now();
+    const newBudget = {
+      id,
+      type: "Expense",
+      category: "New Item",
+      description: "",
+      classification: "Discretionary",
+      fixed: "Variable",
+      frequency: "Monthly",
+      months: Object.fromEntries(MONTHS.map(m => [m, 0]))
+    };
+    const newActual = {
+      ...newBudget,
+      id: id + 1,
+      months: Object.fromEntries(MONTHS.map(m => [m, 0]))
+    };
+    setRows(prev => [...prev, newBudget]);
+    setActuals(prev => [...prev, newActual]);
+  };
+  const upd = u => {
+    // When budget row is updated, sync metadata to matching actuals row
+    setRows(prev => prev.map(r => r.id === u.id ? u : r));
+    setActuals(prev => prev.map(a => {
+      const bRow = rows.find(r => r.id === u.id);
+      if (!bRow) return a;
+      // Match by old category name
+      if (a.category === bRow.category && a.type === bRow.type) {
+        return {
+          ...a,
+          category: u.category,
+          type: u.type,
+          classification: u.classification,
+          description: u.description,
+          fixed: u.fixed,
+          frequency: u.frequency
+        };
+      }
+      return a;
+    }));
+  };
+  const del = id => {
+    const row = rows.find(r => r.id === id);
+    setRows(prev => prev.filter(r => r.id !== id));
+    if (row) setActuals(prev => prev.filter(a => !(a.category === row.category && a.type === row.type)));
+  };
+
+  // Sync: add missing actuals rows for any budget rows that don't have a match
+  const syncActuals = () => {
+    const missing = rows.filter(b => !actuals.find(a => a.category === b.category && a.type === b.type));
+    if (missing.length === 0) {
+      alert("Actuals are fully in sync with budget — no missing rows.");
+      return;
+    }
+    const newRows = missing.map(b => ({
+      ...b,
+      id: Date.now() + Math.random(),
+      months: Object.fromEntries(MONTHS.map(m => [m, 0]))
+    }));
+    setActuals(prev => [...prev, ...newRows]);
+    alert(`Added ${missing.length} missing actuals row${missing.length > 1 ? "s" : ""}: ${missing.map(r => r.category).join(", ")}`);
+  };
+
+  // Orphaned actuals (no matching budget row)
+  const orphans = actuals.filter(a => !rows.find(b => b.category === a.category && b.type === a.type));
+  const filtered = rows.filter(r => filter === "All" || r.type === filter || r.classification === filter);
+  const sorted = [...filtered].sort((a, b) => {
+    const av = a[sortCol] || "",
+      bv = b[sortCol] || "";
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+  const totals = MONTHS.reduce((acc, m) => {
+    acc[m] = filtered.reduce((s, r) => s + (Number(r.months[m]) || 0), 0);
+    return acc;
+  }, {});
+  const grand = Object.values(totals).reduce((s, v) => s + v, 0);
+  const SortTh = ({
+    col,
+    label,
+    width,
+    align = "left"
+  }) => {
+    const active = sortCol === col;
+    return /*#__PURE__*/React.createElement("th", {
+      style: {
+        ...S.th,
+        width: `${width}px`,
+        textAlign: align,
+        cursor: "pointer",
+        userSelect: "none",
+        color: active ? "#2d5a8e" : "#7a90a8"
+      },
+      onClick: () => toggleSort(col)
+    }, label, active ? sortDir === 1 ? " ▲" : " ▼" : " ↕");
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "7px",
+      marginBottom: "10px",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Budget Setup"), orphans.length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      background: "#faeaea",
+      color: "#a33a3a",
+      padding: "2px 8px",
+      borderRadius: "4px",
+      fontWeight: 600
+    }
+  }, "\u26A0 ", orphans.length, " orphaned actuals row", orphans.length > 1 ? "s" : "", " \u2014 no matching budget line"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "4px",
+      marginLeft: "auto",
+      flexWrap: "wrap"
+    }
+  }, ["All", "Income", "Savings", "Expense", "Discretionary", "Necessity", "Protection"].map(f => /*#__PURE__*/React.createElement("button", {
+    key: f,
+    onClick: () => setFilter(f),
+    style: {
+      ...S.btn,
+      ...(filter === f ? {
+        background: "#2d5a8e",
+        color: "#ffffff",
+        border: "none"
+      } : {}),
+      padding: "2px 8px"
+    }
+  }, f)), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...S.btn,
+      color: "#0f6e56",
+      borderColor: "#0f6e56"
+    },
+    onClick: syncActuals
+  }, "\u27F3 Sync Actuals"), /*#__PURE__*/React.createElement("button", {
+    style: S.btnP,
+    onClick: newRow
+  }, "+ Add Row"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      ...S.table,
+      tableLayout: "fixed",
+      minWidth: "1560px"
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement(SortTh, {
+    col: "type",
+    label: "Type",
+    width: 76
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "category",
+    label: "Category",
+    width: 105
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "description",
+    label: "Description",
+    width: 140
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "classification",
+    label: "Classification",
+    width: 105
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "fixed",
+    label: "F/V",
+    width: 74
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "frequency",
+    label: "Freq",
+    width: 86
+  }), MONTHS.map(m => /*#__PURE__*/React.createElement("th", {
+    key: m,
+    style: {
+      ...S.th,
+      width: "66px",
+      textAlign: "right"
+    }
+  }, m)), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "85px",
+      textAlign: "right"
+    }
+  }, "Annual"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "36px"
+    }
+  }))), /*#__PURE__*/React.createElement("tbody", null, sorted.map(row => /*#__PURE__*/React.createElement(BRow, {
+    key: row.id,
+    row: row,
+    onUpdate: upd,
+    onDelete: () => del(row.id),
+    audit: audit
+  }))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderTop: "2px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    colSpan: 6,
+    style: {
+      ...S.td,
+      fontWeight: 700,
+      color: "#7a90a8"
+    }
+  }, "TOTAL"), MONTHS.map(m => /*#__PURE__*/React.createElement("td", {
+    key: m,
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#1a2e4a",
+      fontSize: "11px"
+    }
+  }, ff(totals[m]))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#2d5a8e"
+    }
+  }, ff(grand)), /*#__PURE__*/React.createElement("td", null))))));
+}
+
+// ── ACTUALS MODULE (Actuals Entry — amounts only, locked to budget) ─
+function ActualsModule({
+  budget,
+  actuals,
+  setActuals,
+  audit
+}) {
+  const [filter, setFilter] = useState("All");
+  const [sortCol, setSortCol] = useState("type");
+  const [sortDir, setSortDir] = useState(1);
+  const toggleSort = col => {
+    if (sortCol === col) setSortDir(d => d * -1);else {
+      setSortCol(col);
+      setSortDir(1);
+    }
+  };
+  const upd = u => setActuals(prev => prev.map(a => a.id === u.id ? u : a));
+
+  // For each budget row, find or create matching actuals row
+  const pairs = budget.map(b => {
+    const a = actuals.find(x => x.category === b.category && x.type === b.type) || {
+      id: Date.now() + Math.random(),
+      category: b.category,
+      type: b.type,
+      classification: b.classification,
+      description: b.description,
+      fixed: b.fixed,
+      frequency: b.frequency,
+      months: Object.fromEntries(MONTHS.map(m => [m, 0]))
+    };
+    return {
+      b,
+      a
+    };
+  });
+  const filtered = pairs.filter(({
+    b
+  }) => filter === "All" || b.type === filter || b.classification === filter);
+  const sorted = [...filtered].sort((x, y) => {
+    const av = x.b[sortCol] || "",
+      bv = y.b[sortCol] || "";
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+  const totals = MONTHS.reduce((acc, m) => {
+    acc[m] = {
+      actual: filtered.reduce((s, {
+        a
+      }) => s + (Number(a.months[m]) || 0), 0),
+      budget: filtered.reduce((s, {
+        b
+      }) => s + (Number(b.months[m]) || 0), 0)
+    };
+    return acc;
+  }, {});
+  const grandActual = Object.values(totals).reduce((s, v) => s + v.actual, 0);
+  const grandBudget = Object.values(totals).reduce((s, v) => s + v.budget, 0);
+  const SortTh = ({
+    col,
+    label,
+    width
+  }) => {
+    const active = sortCol === col;
+    return /*#__PURE__*/React.createElement("th", {
+      style: {
+        ...S.th,
+        width: `${width}px`,
+        cursor: "pointer",
+        userSelect: "none",
+        color: active ? "#2d5a8e" : "#7a90a8"
+      },
+      onClick: () => toggleSort(col)
+    }, label, active ? sortDir === 1 ? " ▲" : " ▼" : " ↕");
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "7px",
+      marginBottom: "8px",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Actuals Entry"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8",
+      background: "#f0f4f8",
+      padding: "2px 8px",
+      borderRadius: "4px"
+    }
+  }, "Category names and types are locked to Budget Setup"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "4px",
+      marginLeft: "auto",
+      flexWrap: "wrap"
+    }
+  }, ["All", "Income", "Savings", "Expense", "Discretionary", "Necessity", "Protection"].map(f => /*#__PURE__*/React.createElement("button", {
+    key: f,
+    onClick: () => setFilter(f),
+    style: {
+      ...S.btn,
+      ...(filter === f ? {
+        background: "#2d5a8e",
+        color: "#ffffff",
+        border: "none"
+      } : {}),
+      padding: "2px 8px"
+    }
+  }, f)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      ...S.table,
+      tableLayout: "fixed",
+      minWidth: "1560px"
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement(SortTh, {
+    col: "type",
+    label: "Type",
+    width: 76
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "category",
+    label: "Category",
+    width: 105
+  }), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "140px"
+    }
+  }, "Description"), /*#__PURE__*/React.createElement(SortTh, {
+    col: "classification",
+    label: "Classification",
+    width: 105
+  }), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "86px"
+    }
+  }, "Freq"), MONTHS.map(m => /*#__PURE__*/React.createElement("th", {
+    key: m,
+    style: {
+      ...S.th,
+      width: "66px",
+      textAlign: "right"
+    }
+  }, m)), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "75px",
+      textAlign: "right"
+    }
+  }, "Actual"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "75px",
+      textAlign: "right"
+    }
+  }, "Variance"))), /*#__PURE__*/React.createElement("tbody", null, sorted.map(({
+    b,
+    a
+  }) => /*#__PURE__*/React.createElement(ARow, {
+    key: b.id,
+    budgetRow: b,
+    actualRow: a,
+    onUpdate: upd,
+    audit: audit
+  }))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderTop: "2px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    colSpan: 5,
+    style: {
+      ...S.td,
+      fontWeight: 700,
+      color: "#7a90a8"
+    }
+  }, "TOTAL"), MONTHS.map(m => /*#__PURE__*/React.createElement("td", {
+    key: m,
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontSize: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      color: "#1a2e4a"
+    }
+  }, ff(totals[m].actual)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#a8bcd0"
+    }
+  }, ff(totals[m].budget)))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#2d5a8e"
+    }
+  }, ff(grandActual)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: grandActual - grandBudget <= 0 ? "#1a6e42" : "#a33a3a"
+    }
+  }, grandActual - grandBudget >= 0 ? "+" : "", ff(grandActual - grandBudget)))))));
+}
+
+// ── VARIANCE ──────────────────────────────────────────────────
+function VarianceModule({
+  budget,
+  actuals
+}) {
+  const [vm, setVm] = useState(CM);
+  const [ft, setFt] = useState("All");
+  const [onlyVar, setOnlyVar] = useState(false);
+  const m = MONTHS[vm];
+  const rows = budget.map(bRow => {
+    const aRow = actuals.find(a => a.category === bRow.category && a.type === bRow.type);
+    const bV = Number(bRow.months[m]) || 0,
+      aV = aRow ? Number(aRow.months[m]) || 0 : 0;
+    const diff = aV - bV,
+      pct = bV !== 0 ? diff / bV * 100 : aV !== 0 ? 100 : 0;
+    const fav = bRow.type === "Income" || bRow.type === "Savings" ? diff >= 0 : diff <= 0;
+    return {
+      ...bRow,
+      bV,
+      aV,
+      diff,
+      pct,
+      fav
+    };
+  });
+  const filtered = rows.filter(r => (ft === "All" || r.type === ft || r.classification === ft) && (!onlyVar || Math.abs(r.diff) > 0));
+  const tB = filtered.reduce((s, r) => s + r.bV, 0),
+    tA = filtered.reduce((s, r) => s + r.aV, 0),
+    tD = tA - tB;
+  const ytdRows = budget.map(bRow => {
+    const aRow = actuals.find(a => a.category === bRow.category && a.type === bRow.type);
+    const bY = MONTHS.slice(0, CM + 1).reduce((s, mo) => s + (Number(bRow.months[mo]) || 0), 0);
+    const aY = aRow ? MONTHS.slice(0, CM + 1).reduce((s, mo) => s + (Number(aRow.months[mo]) || 0), 0) : 0;
+    return {
+      category: bRow.category,
+      type: bRow.type,
+      classification: bRow.classification,
+      bY,
+      aY,
+      diff: aY - bY
+    };
+  });
+  const varChart = ytdRows.filter(r => Math.abs(r.diff) > 100).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff)).slice(0, 10).map(r => ({
+    name: r.category,
+    variance: r.diff,
+    fav: r.type === "Income" || r.type === "Savings" ? r.diff >= 0 : r.diff <= 0
+  }));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(4, 10)
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: `${ML[vm]} Budgeted`,
+    value: ff(tB),
+    color: "#1a2e4a"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: `${ML[vm]} Actual`,
+    value: ff(tA),
+    color: "#1a2e4a"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Monthly Variance ($)",
+    value: ff(Math.abs(tD)),
+    color: tD <= 0 ? "#1a6e42" : "#a33a3a"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Monthly Variance (%)",
+    value: `${tD >= 0 ? "+" : ""}${tB !== 0 ? (tD / tB * 100).toFixed(1) : 0}%`,
+    color: tD <= 0 ? "#1a6e42" : "#a33a3a"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: S.grid(2, 12)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "YTD Variance by Category"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 280
+  }, /*#__PURE__*/React.createElement(BarChart, {
+    data: varChart,
+    layout: "vertical",
+    margin: {
+      top: 0,
+      right: 60,
+      bottom: 0,
+      left: 50
+    }
+  }, /*#__PURE__*/React.createElement(XAxis, {
+    type: "number",
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    type: "category",
+    dataKey: "name",
+    tick: {
+      fontSize: 11,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 70
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: v => [ff(v), "Variance"]
+  })), /*#__PURE__*/React.createElement(ReferenceLine, {
+    x: 0,
+    stroke: "#d0dce8",
+    strokeWidth: 2
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "variance",
+    radius: 4,
+    name: "Variance"
+  }, varChart.map((e, i) => /*#__PURE__*/React.createElement(Cell, {
+    key: i,
+    fill: e.fav ? "#1a6e42" : "#a33a3a"
+  })))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      marginBottom: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Monthly Detail \u2014 ", ML[vm]), /*#__PURE__*/React.createElement("label", {
+    style: {
+      marginLeft: "auto",
+      fontSize: "11px",
+      color: "#7a90a8",
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: onlyVar,
+    onChange: e => setOnlyVar(e.target.checked),
+    style: {
+      width: "12px",
+      height: "12px"
+    }
+  }), "Variance only")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "4px",
+      marginBottom: "7px",
+      flexWrap: "wrap"
+    }
+  }, ML.map((ml, i) => /*#__PURE__*/React.createElement("button", {
+    key: ml,
+    onClick: () => setVm(i),
+    style: {
+      ...S.btn,
+      ...(vm === i ? {
+        background: "#2d5a8e",
+        color: "#ffffff",
+        border: "none"
+      } : {}),
+      padding: "2px 6px",
+      fontSize: "10px"
+    }
+  }, ml))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "4px",
+      marginBottom: "7px",
+      flexWrap: "wrap"
+    }
+  }, ["All", "Income", "Savings", "Expense", "Discretionary"].map(f => /*#__PURE__*/React.createElement("button", {
+    key: f,
+    onClick: () => setFt(f),
+    style: {
+      ...S.btn,
+      ...(ft === f ? {
+        background: "#d0dce8",
+        color: "#1a2e4a"
+      } : {}),
+      padding: "2px 6px",
+      fontSize: "10px"
+    }
+  }, f))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowY: "auto",
+      maxHeight: "230px"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Category"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Budget"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Actual"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Variance"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "%"))), /*#__PURE__*/React.createElement("tbody", null, filtered.map((row, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      fontSize: "11px"
+    }
+  }, row.category), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontSize: "11px",
+      color: "#7a90a8"
+    }
+  }, ff(row.bV)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontSize: "11px"
+    }
+  }, ff(row.aV)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontSize: "11px",
+      color: row.fav ? "#1a6e42" : "#a33a3a",
+      fontWeight: 600
+    }
+  }, row.diff >= 0 ? "+" : "", ff(row.diff)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontSize: "10px",
+      color: row.fav ? "#1a6e42" : "#a33a3a"
+    }
+  }, row.pct >= 0 ? "+" : "", row.pct.toFixed(0), "%")))))))));
+}
+
+// ── NET WORTH ─────────────────────────────────────────────────
+function NetWorthModule({
+  data,
+  setData,
+  investments,
+  audit
+}) {
+  const [tab, setTab] = useState("overview");
+  const nw = data;
+  const tA = nw.assets.reduce((s, a) => s + a.value, 0),
+    tL = nw.liabilities.reduce((s, l) => s + l.balance, 0),
+    netW = tA - tL;
+  const addA = () => setData({
+    ...nw,
+    assets: [...nw.assets, {
+      id: Date.now(),
+      name: "New Asset",
+      category: "Other",
+      value: 0,
+      note: ""
+    }]
+  });
+  const updA = u => setData({
+    ...nw,
+    assets: nw.assets.map(a => a.id === u.id ? u : a)
+  });
+  const delA = id => setData({
+    ...nw,
+    assets: nw.assets.filter(a => a.id !== id)
+  });
+  const addL = () => setData({
+    ...nw,
+    liabilities: [...nw.liabilities, {
+      id: Date.now(),
+      name: "New Liability",
+      category: "Other",
+      balance: 0,
+      rate: 0,
+      originalBalance: 0,
+      monthlyPayment: 0,
+      termYears: 0
+    }]
+  });
+  const updL = u => setData({
+    ...nw,
+    liabilities: nw.liabilities.map(l => l.id === u.id ? u : l)
+  });
+  const delL = id => setData({
+    ...nw,
+    liabilities: nw.liabilities.filter(l => l.id !== id)
+  });
+  const recordNW = () => {
+    const entry = {
+      month: new Date().toLocaleString("default", {
+        month: "short",
+        year: "numeric"
+      }),
+      netWorth: Math.round(netW)
+    };
+    setData({
+      ...nw,
+      history: [...nw.history.filter(h => h.month !== entry.month), entry].sort((a, b) => new Date(a.month) - new Date(b.month))
+    });
+  };
+  const assetMix = nw.assets.map(a => ({
+    name: a.name,
+    value: a.value
+  }));
+  const liabTotalInterest = nw.liabilities.reduce((s, l) => {
+    const r = l.rate / 100 / 12,
+      n = l.termYears * 12;
+    return s + (r > 0 ? l.monthlyPayment * n - l.originalBalance : 0);
+  }, 0);
+  const debtPayoff = nw.liabilities.map(l => {
+    if (!l.monthlyPayment || !l.balance) return null;
+    const r = l.rate / 100 / 12;
+    if (r === 0) return {
+      ...l,
+      monthsLeft: Math.ceil(l.balance / l.monthlyPayment),
+      totalInterest: 0
+    };
+    const ml = Math.ceil(-Math.log(1 - l.balance * r / l.monthlyPayment) / Math.log(1 + r));
+    return {
+      ...l,
+      monthsLeft: ml,
+      totalInterest: l.monthlyPayment * ml - l.balance
+    };
+  }).filter(Boolean);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(5, 10)
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: "Total Assets",
+    value: ff(tA),
+    color: "#1a6e42"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Total Liabilities",
+    value: ff(tL),
+    color: "#a33a3a"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Net Worth",
+    value: ff(netW),
+    color: "#2d5a8e"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Debt-to-Asset",
+    value: `${(tL / tA * 100).toFixed(1)}%`,
+    color: tL / tA < 0.4 ? "#1a6e42" : "#c47f00",
+    alert: tL / tA > 0.5 ? "#c47f00" : undefined
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Total Interest Cost",
+    value: ff(liabTotalInterest),
+    color: "#c47f00"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "6px"
+    }
+  }, [["overview", "Overview"], ["assets", "Assets"], ["liabilities", "Liabilities"], ["payoff", "Debt Payoff"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setTab(k),
+    style: {
+      ...S.btn,
+      ...(tab === k ? {
+        background: "#2d5a8e",
+        color: "#ffffff",
+        border: "none"
+      } : {})
+    }
+  }, l)), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...S.btn,
+      marginLeft: "auto"
+    },
+    onClick: recordNW
+  }, "\uD83D\uDCCC Record Today")), tab === "overview" && /*#__PURE__*/React.createElement("div", {
+    style: S.grid(3, 12)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.card,
+      gridColumn: "1/3"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Net Worth History"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 190
+  }, /*#__PURE__*/React.createElement(AreaChart, {
+    data: nw.history,
+    margin: {
+      top: 4,
+      right: 4,
+      bottom: 0,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+    id: "gNW",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "5%",
+    stopColor: "#2d5a8e",
+    stopOpacity: 0.2
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "95%",
+    stopColor: "#2d5a8e",
+    stopOpacity: 0
+  }))), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "month",
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    interval: 2
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: v => [ff(v), "Net Worth"]
+  })), /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "netWorth",
+    stroke: "#2d5a8e",
+    fill: "url(#gNW)",
+    strokeWidth: 2,
+    dot: false
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Asset Allocation"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 140
+  }, /*#__PURE__*/React.createElement(PieChart, null, /*#__PURE__*/React.createElement(Pie, {
+    data: assetMix,
+    dataKey: "value",
+    cx: "50%",
+    cy: "50%",
+    innerRadius: 35,
+    outerRadius: 60,
+    strokeWidth: 2,
+    stroke: "#f0f4f8"
+  }, assetMix.map((_, i) => /*#__PURE__*/React.createElement(Cell, {
+    key: i,
+    fill: PC[i % PC.length]
+  }))), /*#__PURE__*/React.createElement(Tooltip, {
+    formatter: v => [ff(v)],
+    contentStyle: TT.contentStyle
+  }))), assetMix.map((d, i) => /*#__PURE__*/React.createElement("div", {
+    key: d.name,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "11px",
+      padding: "2px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      color: "#7a90a8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: "7px",
+      height: "7px",
+      borderRadius: "2px",
+      background: PC[i],
+      flexShrink: 0
+    }
+  }), d.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#1a2e4a",
+      fontWeight: 600
+    }
+  }, (d.value / tA * 100).toFixed(0), "%"))))), tab === "assets" && /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      marginBottom: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Assets"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...S.btnP,
+      marginLeft: "auto"
+    },
+    onClick: addA
+  }, "+ Add Asset")), /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Name"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Category"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Value"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Note"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "36px"
+    }
+  }))), /*#__PURE__*/React.createElement("tbody", null, nw.assets.map(a => /*#__PURE__*/React.createElement("tr", {
+    key: a.id,
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "140px"
+    },
+    value: a.name,
+    onChange: e => updA({
+      ...a,
+      name: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "120px"
+    },
+    value: a.category,
+    onChange: e => updA({
+      ...a,
+      category: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement(MoneyInput, {
+    style: {
+      ...S.ni,
+      width: "110px",
+      border: "1px solid #d0dce8",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: a.value,
+    onChange: nv => {
+      audit("Net Worth", a.name, a.value, nv, "Asset value");
+      updA({
+        ...a,
+        value: nv
+      });
+    }
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    style: S.inp,
+    value: a.note,
+    onChange: e => updA({
+      ...a,
+      note: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("button", {
+    style: S.btnD,
+    onClick: () => delA(a.id)
+  }, "\u2715"))))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderTop: "2px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    colSpan: 2,
+    style: {
+      ...S.td,
+      fontWeight: 700,
+      color: "#7a90a8"
+    }
+  }, "Total Assets"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#1a6e42"
+    }
+  }, ff(tA)), /*#__PURE__*/React.createElement("td", {
+    colSpan: 2
+  }))))), tab === "liabilities" && /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      marginBottom: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Liabilities"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...S.btnP,
+      marginLeft: "auto"
+    },
+    onClick: addL
+  }, "+ Add Liability")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      ...S.table,
+      minWidth: "900px"
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ["Name", "Category", "Balance", "Rate %", "Monthly Pmt", "Original Bal", "Term (Yrs)", ""].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: {
+      ...S.th,
+      textAlign: ["Balance", "Rate %", "Monthly Pmt", "Original Bal", "Term (Yrs)"].includes(h) ? "right" : "left"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, nw.liabilities.map(l => /*#__PURE__*/React.createElement("tr", {
+    key: l.id,
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "120px"
+    },
+    value: l.name,
+    onChange: e => updL({
+      ...l,
+      name: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "100px"
+    },
+    value: l.category,
+    onChange: e => updL({
+      ...l,
+      category: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement(MoneyInput, {
+    style: {
+      ...S.ni,
+      width: "100px",
+      border: "1px solid #d0dce8",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: l.balance,
+    onChange: nv => {
+      audit("Net Worth", l.name, l.balance, nv, "Liability balance");
+      updL({
+        ...l,
+        balance: nv
+      });
+    }
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      ...S.ni,
+      width: "58px",
+      border: "1px solid #2a3347",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: l.rate,
+    step: "0.1",
+    onChange: e => updL({
+      ...l,
+      rate: Number(e.target.value)
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      ...S.ni,
+      width: "78px",
+      border: "1px solid #2a3347",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: l.monthlyPayment,
+    onChange: e => updL({
+      ...l,
+      monthlyPayment: Number(e.target.value)
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      ...S.ni,
+      width: "100px",
+      border: "1px solid #2a3347",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: l.originalBalance,
+    onChange: e => updL({
+      ...l,
+      originalBalance: Number(e.target.value)
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      ...S.ni,
+      width: "58px",
+      border: "1px solid #2a3347",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: l.termYears,
+    onChange: e => updL({
+      ...l,
+      termYears: Number(e.target.value)
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("button", {
+    style: S.btnD,
+    onClick: () => delL(l.id)
+  }, "\u2715"))))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderTop: "2px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    colSpan: 2,
+    style: {
+      ...S.td,
+      fontWeight: 700,
+      color: "#7a90a8"
+    }
+  }, "Total Liabilities"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#a33a3a"
+    }
+  }, ff(tL)), /*#__PURE__*/React.createElement("td", {
+    colSpan: 5
+  })))))), tab === "payoff" && /*#__PURE__*/React.createElement("div", {
+    style: S.grid(2, 12)
+  }, debtPayoff.map(l => {
+    const paid = Math.round(l.originalBalance - l.balance),
+      pct = l.originalBalance > 0 ? paid / l.originalBalance * 100 : 0;
+    const yL = Math.floor(l.monthsLeft / 12),
+      moL = l.monthsLeft % 12;
+    return /*#__PURE__*/React.createElement("div", {
+      key: l.id,
+      style: S.card
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: "10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 700,
+        color: "#1a2e4a"
+      }
+    }, l.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: "#7a90a8"
+      }
+    }, l.rate, "% APR \xB7 ", ff(l.monthlyPayment), "/mo")), /*#__PURE__*/React.createElement("span", {
+      style: S.badge("#a33a3a")
+    }, l.category)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        marginBottom: "8px"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: "#7a90a8"
+      }
+    }, "Remaining"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: "#a33a3a"
+      }
+    }, ff(l.balance))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: "#7a90a8"
+      }
+    }, "Total Interest"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "16px",
+        fontWeight: 700,
+        color: "#c47f00"
+      }
+    }, ff(Math.round(l.totalInterest)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: "#7a90a8"
+      }
+    }, "Payoff"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "14px",
+        fontWeight: 600,
+        color: "#7a90a8"
+      }
+    }, yL > 0 ? `${yL}y ` : "", moL, "m"))), /*#__PURE__*/React.createElement(PBar, {
+      value: paid,
+      max: l.originalBalance,
+      color: "#1a6e42",
+      label: "Paid off",
+      sub: `${pct.toFixed(0)}% · ${ff(paid)}`
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#f0f4f8",
+        borderRadius: "6px",
+        padding: "8px 10px",
+        marginTop: "8px",
+        border: "1px solid #d0dce8"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: "#7a90a8",
+        marginBottom: "4px",
+        textTransform: "uppercase",
+        letterSpacing: "0.4px"
+      }
+    }, "Extra payment impact"), [250, 500, 1000].map(extra => {
+      const r = l.rate / 100 / 12,
+        np = l.monthlyPayment + extra;
+      const nm = r > 0 ? Math.ceil(-Math.log(1 - l.balance * r / np) / Math.log(1 + r)) : Math.ceil(l.balance / np);
+      const saved = l.monthsLeft - nm;
+      return /*#__PURE__*/React.createElement("div", {
+        key: extra,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: "11px",
+          padding: "2px 0",
+          borderBottom: "1px solid #eef2f7"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#7a90a8"
+        }
+      }, "+", ff(extra), "/mo"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#1a6e42"
+        }
+      }, "saves ", Math.max(0, Math.floor(saved / 12)), "y ", Math.max(0, saved % 12), "m \xB7 ", ff(Math.max(0, Math.round(l.totalInterest - (np * nm - l.balance))))));
+    })));
+  })));
+}
+
+// ── INVESTMENTS ───────────────────────────────────────────────
+function IRow({
+  row,
+  onUpdate,
+  onDelete
+}) {
+  const proj = Math.round(row.balance * Math.pow(1 + row.growthRate / 100, 5) + row.contribution * 12 * ((Math.pow(1 + row.growthRate / 100, 5) - 1) / (row.growthRate / 100)));
+  const tc = {
+    "Pre-Tax": "#c47f00",
+    "Roth": "#1a6e42",
+    "Taxable": "#7a90a8",
+    "Tax-Free": "#0f6e56"
+  };
+  const TAX_TREATMENTS = ["Pre-Tax", "Roth", "Taxable", "Tax-Free"];
+  return /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "90px"
+    },
+    value: row.institution,
+    onChange: e => onUpdate({
+      ...row,
+      institution: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "90px"
+    },
+    value: row.accountType,
+    onChange: e => onUpdate({
+      ...row,
+      accountType: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      width: "140px"
+    },
+    value: row.accountName,
+    onChange: e => onUpdate({
+      ...row,
+      accountName: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("select", {
+    style: {
+      ...S.sel,
+      width: "90px",
+      background: tc[row.taxTreatment] + "18",
+      color: tc[row.taxTreatment] || "#7a90a8",
+      fontWeight: 600,
+      border: `1px solid ${tc[row.taxTreatment] || "#d0dce8"}44`
+    },
+    value: row.taxTreatment,
+    onChange: e => onUpdate({
+      ...row,
+      taxTreatment: e.target.value
+    })
+  }, TAX_TREATMENTS.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t
+  }, t)))), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("select", {
+    style: S.sel,
+    value: row.assetType,
+    onChange: e => onUpdate({
+      ...row,
+      assetType: e.target.value
+    })
+  }, ["Equity", "Fixed Income", "Conservative", "Alternative", "Cash"].map(t => /*#__PURE__*/React.createElement("option", {
+    key: t
+  }, t)))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement(MoneyInput, {
+    style: {
+      ...S.ni,
+      width: "100px",
+      border: "1px solid #d0dce8",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: row.balance,
+    onChange: v => onUpdate({
+      ...row,
+      balance: v
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement(MoneyInput, {
+    style: {
+      ...S.ni,
+      width: "70px",
+      border: "1px solid #d0dce8",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: row.contribution,
+    onChange: v => onUpdate({
+      ...row,
+      contribution: v
+    })
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    style: {
+      ...S.ni,
+      width: "44px",
+      border: "1px solid #d0dce8",
+      borderRadius: "5px",
+      background: "#f8fafc"
+    },
+    value: row.growthRate,
+    step: "0.5",
+    onChange: e => onUpdate({
+      ...row,
+      growthRate: Number(e.target.value)
+    })
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, "%")), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#6a5a9e",
+      fontWeight: 600
+    }
+  }, ff(proj)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#1a6e42",
+      fontWeight: 600
+    }
+  }, ff(proj - row.balance)), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("button", {
+    style: S.btnD,
+    onClick: onDelete
+  }, "\u2715")));
+}
+function InvestmentsModule({
+  investments,
+  setInvestments
+}) {
+  const tB = investments.reduce((s, r) => s + r.balance, 0);
+  const tC = investments.reduce((s, r) => s + r.contribution, 0);
+  const pre = investments.filter(r => r.taxTreatment === "Pre-Tax").reduce((s, r) => s + r.balance, 0);
+  const roth = investments.filter(r => r.taxTreatment === "Roth").reduce((s, r) => s + r.balance, 0);
+  const tax = investments.filter(r => r.taxTreatment === "Taxable").reduce((s, r) => s + r.balance, 0);
+  const f5 = investments.reduce((s, r) => s + Math.round(r.balance * Math.pow(1 + r.growthRate / 100, 5) + r.contribution * 12 * ((Math.pow(1 + r.growthRate / 100, 5) - 1) / (r.growthRate / 100))), 0);
+  const mix = [{
+    name: "Retirement Pre-Tax",
+    value: pre
+  }, {
+    name: "Retirement Roth",
+    value: roth
+  }, {
+    name: "Taxable Brokerage",
+    value: tax
+  }, {
+    name: "HSA",
+    value: investments.filter(r => r.accountType === "HSA").reduce((s, r) => s + r.balance, 0)
+  }, {
+    name: "Alternatives",
+    value: investments.filter(r => r.assetType === "Alternative").reduce((s, r) => s + r.balance, 0)
+  }, {
+    name: "Cash",
+    value: investments.filter(r => r.assetType === "Cash").reduce((s, r) => s + r.balance, 0)
+  }].filter(d => d.value > 0);
+  const byInst = Object.entries(investments.reduce((acc, r) => {
+    acc[r.institution] = (acc[r.institution] || 0) + r.balance;
+    return acc;
+  }, {})).map(([k, v]) => ({
+    name: k,
+    value: v
+  }));
+  const growth = [1, 2, 3, 5, 7, 10].map(yr => ({
+    year: `Y${yr}`,
+    current: tB,
+    contributions: investments.reduce((s, r) => s + Math.round(r.contribution * 12 * yr), 0),
+    growth: investments.reduce((s, r) => s + Math.round(r.balance * Math.pow(1 + r.growthRate / 100, yr) + r.contribution * 12 * ((Math.pow(1 + r.growthRate / 100, yr) - 1) / (r.growthRate / 100))), 0) - tB - investments.reduce((s, r) => s + Math.round(r.contribution * 12 * yr), 0)
+  }));
+  const taxA = [{
+    label: "Pre-Tax",
+    value: pre,
+    pct: pre / tB * 100,
+    color: "#c47f00",
+    note: "Taxed at withdrawal"
+  }, {
+    label: "Roth",
+    value: roth,
+    pct: roth / tB * 100,
+    color: "#1a6e42",
+    note: "Tax-free growth"
+  }, {
+    label: "Taxable",
+    value: tax,
+    pct: tax / tB * 100,
+    color: "#7a90a8",
+    note: "Annual tax drag"
+  }, {
+    label: "HSA (Triple Tax)",
+    value: investments.filter(r => r.accountType === "HSA").reduce((s, r) => s + r.balance, 0),
+    pct: investments.filter(r => r.accountType === "HSA").reduce((s, r) => s + r.balance, 0) / tB * 100,
+    color: "#0f6e56",
+    note: "Most tax-efficient"
+  }].filter(d => d.value > 0);
+  const upd = u => setInvestments(prev => prev.map(r => r.id === u.id ? u : r));
+  const del = id => setInvestments(prev => prev.filter(r => r.id !== id));
+  const newRow = () => setInvestments(prev => [...prev, {
+    id: Date.now(),
+    institution: "New",
+    accountType: "Brokerage",
+    accountName: "New Account",
+    taxTreatment: "Taxable",
+    assetType: "Equity",
+    balance: 0,
+    contribution: 0,
+    growthRate: 7.0
+  }]);
+  const [sortCol, setSortCol] = useState("institution");
+  const [sortDir, setSortDir] = useState(1);
+  const toggleSort = col => {
+    if (sortCol === col) setSortDir(d => d * -1);else {
+      setSortCol(col);
+      setSortDir(1);
+    }
+  };
+  const sorted = [...investments].sort((a, b) => {
+    const av = a[sortCol] ?? 0,
+      bv = b[sortCol] ?? 0;
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+  const SortTh = ({
+    col,
+    label,
+    width,
+    align = "left"
+  }) => {
+    const active = sortCol === col;
+    return /*#__PURE__*/React.createElement("th", {
+      style: {
+        ...S.th,
+        width: `${width}px`,
+        textAlign: align,
+        cursor: "pointer",
+        userSelect: "none",
+        color: active ? "#2d5a8e" : "#7a90a8"
+      },
+      onClick: () => toggleSort(col)
+    }, label, active ? sortDir === 1 ? " ▲" : " ▼" : " ↕");
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(6, 10)
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: "Total Invested",
+    value: ff(tB),
+    color: "#1a6e42",
+    sub: {
+      pos: true,
+      text: "8.4% YTD"
+    }
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Taxable Assets",
+    value: ff(tax),
+    color: "#1a2e4a"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Retirement Assets",
+    value: ff(pre + roth),
+    color: "#0f6e56"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Roth Assets",
+    value: ff(roth),
+    color: "#1a6e42"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "5-Year Forecast",
+    value: ff(f5),
+    color: "#6a5a9e"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Monthly Contributions",
+    value: ff(tC),
+    color: "#2d5a8e"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: S.grid(3, 12)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Portfolio Mix"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 150
+  }, /*#__PURE__*/React.createElement(PieChart, null, /*#__PURE__*/React.createElement(Pie, {
+    data: mix,
+    dataKey: "value",
+    cx: "50%",
+    cy: "50%",
+    innerRadius: 38,
+    outerRadius: 62,
+    strokeWidth: 2,
+    stroke: "#f0f4f8"
+  }, mix.map((_, i) => /*#__PURE__*/React.createElement(Cell, {
+    key: i,
+    fill: PC[i % PC.length]
+  }))), /*#__PURE__*/React.createElement(Tooltip, {
+    formatter: v => [ff(v)],
+    contentStyle: TT.contentStyle
+  }))), mix.map((d, i) => /*#__PURE__*/React.createElement("div", {
+    key: d.name,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "10px",
+      padding: "2px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      color: "#7a90a8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: "7px",
+      height: "7px",
+      borderRadius: "2px",
+      background: PC[i],
+      flexShrink: 0
+    }
+  }), d.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#1a2e4a",
+      fontWeight: 600
+    }
+  }, (d.value / tB * 100).toFixed(0), "%")))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "By Institution"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 140
+  }, /*#__PURE__*/React.createElement(BarChart, {
+    data: byInst,
+    layout: "vertical",
+    margin: {
+      top: 0,
+      right: 10,
+      bottom: 0,
+      left: 20
+    }
+  }, /*#__PURE__*/React.createElement(XAxis, {
+    type: "number",
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    type: "category",
+    dataKey: "name",
+    tick: {
+      fontSize: 11,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 70
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    formatter: v => [ff(v)],
+    contentStyle: TT.contentStyle
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "value",
+    radius: [0, 4, 4, 0],
+    fill: "#2d5a8e"
+  }))), byInst.map(d => /*#__PURE__*/React.createElement("div", {
+    key: d.name,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "11px",
+      padding: "2px 0",
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, d.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#1a2e4a",
+      fontWeight: 600
+    }
+  }, ff(d.value))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "10-Year Growth"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 160
+  }, /*#__PURE__*/React.createElement(BarChart, {
+    data: growth,
+    margin: {
+      top: 4,
+      right: 4,
+      bottom: 0,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "year",
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: v => [ff(v)]
+  })), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "current",
+    stackId: "a",
+    fill: "#e8f0f9",
+    name: "Current"
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "contributions",
+    stackId: "a",
+    fill: "#2d5a8e",
+    name: "Contributions"
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "growth",
+    stackId: "a",
+    fill: "#1a6e42",
+    name: "Est. Growth",
+    radius: [3, 3, 0, 0]
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "10px",
+      marginTop: "4px"
+    }
+  }, [["Current", "#e8f0f9"], ["Contributions", "#2d5a8e"], ["Growth", "#1a6e42"]].map(([l, c]) => /*#__PURE__*/React.createElement("span", {
+    key: l,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: "7px",
+      height: "7px",
+      background: c,
+      display: "inline-block",
+      borderRadius: "2px"
+    }
+  }), l))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Tax Efficiency"), /*#__PURE__*/React.createElement("div", {
+    style: S.grid(4, 10)
+  }, taxA.map(t => /*#__PURE__*/React.createElement("div", {
+    key: t.label,
+    style: {
+      background: t.color + "0f",
+      borderRadius: "8px",
+      padding: "10px",
+      borderLeft: `3px solid ${t.color}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8",
+      marginBottom: "3px"
+    }
+  }, t.label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "17px",
+      fontWeight: 700,
+      color: t.color
+    }
+  }, ff(t.value)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8",
+      marginTop: "1px"
+    }
+  }, t.pct.toFixed(0), "% of portfolio"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8",
+      marginTop: "3px",
+      lineHeight: 1.4
+    }
+  }, t.note))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      marginBottom: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Investment Accounts"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...S.btnP,
+      marginLeft: "auto"
+    },
+    onClick: newRow
+  }, "+ Add Account")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      ...S.table,
+      minWidth: "1020px"
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement(SortTh, {
+    col: "institution",
+    label: "Institution",
+    width: 90
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "accountType",
+    label: "Type",
+    width: 90
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "accountName",
+    label: "Name",
+    width: 140
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "taxTreatment",
+    label: "Tax Treatment",
+    width: 110
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "assetType",
+    label: "Asset Type",
+    width: 120
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "balance",
+    label: "Balance",
+    width: 110,
+    align: "right"
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "contribution",
+    label: "Monthly $",
+    width: 88,
+    align: "right"
+  }), /*#__PURE__*/React.createElement(SortTh, {
+    col: "growthRate",
+    label: "Growth %",
+    width: 78,
+    align: "right"
+  }), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "110px",
+      textAlign: "right"
+    }
+  }, "5yr Proj"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "100px",
+      textAlign: "right"
+    }
+  }, "5yr Gain"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      width: "36px"
+    }
+  }))), /*#__PURE__*/React.createElement("tbody", null, sorted.map(row => /*#__PURE__*/React.createElement(IRow, {
+    key: row.id,
+    row: row,
+    onUpdate: upd,
+    onDelete: () => del(row.id)
+  }))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderTop: "2px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    colSpan: 5,
+    style: {
+      ...S.td,
+      fontWeight: 700,
+      color: "#7a90a8"
+    }
+  }, "TOTAL"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#1a6e42"
+    }
+  }, ff(tB)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#2d5a8e"
+    }
+  }, ff(tC)), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#6a5a9e"
+    }
+  }, ff(f5)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontWeight: 700,
+      color: "#1a6e42"
+    }
+  }, ff(f5 - tB)), /*#__PURE__*/React.createElement("td", null)))))));
+}
+
+// ── RETIREMENT ────────────────────────────────────────────────
+const DR1 = {
+  name: "Person 1",
+  currentAge: 56,
+  retirementAge: 62,
+  ssAge: 67,
+  socialSecurity: 2800,
+  monthlySpending: 5000,
+  expectedReturn: 7.5,
+  inflation: 3.0,
+  vaBenefits: 0
+};
+const DR2 = {
+  name: "Person 2",
+  currentAge: 59,
+  retirementAge: 62,
+  ssAge: 67,
+  socialSecurity: 2400,
+  monthlySpending: 4500,
+  expectedReturn: 7.5,
+  inflation: 3.0,
+  vaBenefits: 4000
+};
+const RMD_AGE = 75;
+const RMD_FACTORS = {
+  75: 24.6,
+  76: 23.7,
+  77: 22.9,
+  78: 22.0,
+  79: 21.1,
+  80: 20.2,
+  81: 19.4,
+  82: 18.5,
+  83: 17.7,
+  84: 16.8,
+  85: 16.0
+};
+function RetirementModule({
+  investments
+}) {
+  const [p1, setP1] = useLS("ret_p1_v3", DR1);
+  const [p2, setP2] = useLS("ret_p2_v3", DR2);
+  const [person, setPerson] = useState("both");
+  const preRothTotal = investments.filter(r => r.taxTreatment === "Pre-Tax").reduce((s, r) => s + r.balance, 0);
+  const calc = (params, invs, portionPct = 1) => {
+    const tot = invs.reduce((s, r) => s + r.balance, 0) * portionPct;
+    const mc = invs.reduce((s, r) => s + r.contribution, 0) * portionPct;
+    const ar = params.expectedReturn / 100,
+      ir = params.inflation / 100;
+    const ytr = Math.max(0, params.retirementAge - params.currentAge);
+    const rr = (1 + ar) / (1 + ir) - 1;
+    const portR = tot * Math.pow(1 + ar, ytr) + mc * 12 * ((Math.pow(1 + ar, ytr) - 1) / ar);
+    const annSS = params.socialSecurity * 12;
+    const annVA = (params.vaBenefits || 0) * 12; // tax-free, not inflation-adjusted in model
+    const annSpend = params.monthlySpending * 12;
+    const annWD = Math.max(0, annSpend - annSS - annVA); // VA + SS offset spending before portfolio
+    const portN = annWD / 0.04;
+    const fr = annWD === 0 ? 999 : portR / portN; // if fully covered by VA+SS, overfunded
+    const gd = Array.from({
+      length: ytr + 36
+    }, (_, i) => {
+      let v;
+      if (i <= ytr) {
+        v = tot * Math.pow(1 + ar, i) + mc * 12 * ((Math.pow(1 + ar, i) - 1) / ar);
+      } else {
+        const rp = tot * Math.pow(1 + ar, ytr) + mc * 12 * ((Math.pow(1 + ar, ytr) - 1) / ar),
+          wy = i - ytr;
+        v = annWD > 0 ? rp * Math.pow(1 + rr, wy) - annWD * ((Math.pow(1 + rr, wy) - 1) / rr) : rp * Math.pow(1 + ar, wy);
+      }
+      return {
+        age: params.currentAge + i,
+        value: Math.max(0, Math.round(v))
+      };
+    });
+    return {
+      portR,
+      portN,
+      fr,
+      annSS,
+      annVA,
+      annWD,
+      annSpend,
+      gd,
+      ytr,
+      rr
+    };
+  };
+  const tot = investments.reduce((s, r) => s + r.contribution, 0) || 1;
+  const p1c = investments.filter(r => r.taxTreatment === "Pre-Tax" || r.taxTreatment === "Roth").reduce((s, r) => s + r.contribution, 0);
+  const split = Math.min(0.8, Math.max(0.2, tot > 0 ? p1c / tot : 0.5));
+  const A1 = calc(p1, investments, split);
+  const A2 = calc(p2, investments, 1 - split);
+  const combinedIncome = Math.round((A1.portR * 0.04 + A2.portR * 0.04 + p1.socialSecurity * 12 + p2.socialSecurity * 12 + (p1.vaBenefits || 0) * 12 + (p2.vaBenefits || 0) * 12) / 12);
+  const combinedNeeded = p1.monthlySpending + p2.monthlySpending;
+  const combinedFunded = combinedIncome >= combinedNeeded;
+  const rmdSchedule = (params, portionPct) => {
+    const preRoth = preRothTotal * portionPct;
+    return Object.keys(RMD_FACTORS).map(Number).map(age => {
+      const yrsFromNow = age - params.currentAge;
+      if (yrsFromNow < 0) return null;
+      const preAtAge = preRoth * Math.pow(1 + params.expectedReturn / 100, yrsFromNow);
+      return {
+        age,
+        rmd: Math.round(preAtAge / RMD_FACTORS[age])
+      };
+    }).filter(Boolean);
+  };
+  const rmd1 = rmdSchedule(p1, split);
+  const rmd2 = rmdSchedule(p2, 1 - split);
+  const ParamPanel = ({
+    p,
+    setP,
+    label,
+    color,
+    res
+  }) => {
+    const ok = res.fr >= 1.0;
+    const [nameVal, setNameVal] = useState(p.name || "");
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...S.card,
+        borderTop: `3px solid ${color}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: S.secTitle
+    }, label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "12px",
+        fontWeight: 700,
+        color: ok ? "#1a6e42" : "#a33a3a"
+      }
+    }, ok ? `✓ ${((res.fr - 1) * 100).toFixed(0)}% surplus` : `⚠ ${((1 - res.fr) * 100).toFixed(0)}% gap`)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "5px 0",
+        borderBottom: "1px solid #eef2f7"
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        fontSize: "11px",
+        color: "#7a90a8"
+      }
+    }, "Name"), /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      value: nameVal,
+      onChange: e => setNameVal(e.target.value),
+      onBlur: e => setP({
+        ...p,
+        name: e.target.value
+      }),
+      style: {
+        ...S.inp,
+        width: "120px",
+        textAlign: "right"
+      }
+    })), [["Current Age", "currentAge"], ["Retirement Age", "retirementAge"], ["SS Claim Age", "ssAge"], ["SS Monthly ($)", "socialSecurity"], ["VA Benefits (mo. tax-free)", "vaBenefits"], ["Monthly Spending ($)", "monthlySpending"], ["Expected Return %", "expectedReturn"], ["Inflation %", "inflation"]].map(([lbl, key]) => /*#__PURE__*/React.createElement("div", {
+      key: key,
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "5px 0",
+        borderBottom: "1px solid #eef2f7"
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        fontSize: "11px",
+        color: key === "vaBenefits" ? "#0f6e56" : "#7a90a8",
+        fontWeight: key === "vaBenefits" ? 600 : 400
+      }
+    }, lbl), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      value: p[key] || 0,
+      step: key === "expectedReturn" || key === "inflation" ? 0.5 : 1,
+      onChange: e => setP({
+        ...p,
+        [key]: Number(e.target.value)
+      }),
+      style: {
+        ...S.ni,
+        width: "90px",
+        border: `1px solid ${key === "vaBenefits" ? "#0f6e5644" : "#d0dce8"}`,
+        borderRadius: "5px",
+        background: key === "vaBenefits" ? "#e4f4f0" : "#f8fafc",
+        textAlign: "right"
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: "10px",
+        padding: "8px 10px",
+        background: ok ? "#e8f5ee" : "#faeaea",
+        borderRadius: "6px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "11px",
+        color: ok ? "#1a6e42" : "#a33a3a",
+        fontWeight: 600
+      }
+    }, "Portfolio at retirement: ", ff(Math.round(res.portR))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: "#7a90a8",
+        marginTop: "2px"
+      }
+    }, res.ytr, " yrs to retire \xB7 SS at age ", p.ssAge, " \xB7 needs ", ff(Math.round(res.portN)), " from portfolio"), (p.vaBenefits || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: "10px",
+        color: "#0f6e56",
+        marginTop: "3px",
+        fontWeight: 600
+      }
+    }, "VA ", ff(p.vaBenefits), "/mo reduces portfolio draw by ", ff(Math.round(p.vaBenefits * 12 / 0.04)), " needed")));
+  };
+  const maxLen = Math.max(A1.gd.length, A2.gd.length);
+  const growthData = Array.from({
+    length: maxLen
+  }, (_, i) => ({
+    p1age: A1.gd[i]?.age,
+    p1val: A1.gd[i]?.value,
+    p2val: A2.gd[i]?.value
+  })).filter(d => (d.p1val || 0) + (d.p2val || 0) > 0);
+  const rothConv = [50000, 100000, 150000].map(amt => {
+    const taxNow = amt * 0.24,
+      fv = amt * Math.pow(1 + p1.expectedReturn / 100, p1.retirementAge - p1.currentAge),
+      taxLater = fv * 0.22;
+    return {
+      amt,
+      taxNow,
+      fv,
+      taxLater,
+      net: taxLater - taxNow
+    };
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(4, 10)
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: "Combined Portfolio @ Retire",
+    value: ff(Math.round(A1.portR + A2.portR)),
+    color: "#1a6e42"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Combined Monthly Income",
+    value: ff(combinedIncome) + "/mo",
+    color: "#2d5a8e"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Monthly Spending Target",
+    value: ff(combinedNeeded) + "/mo",
+    color: "#1a2e4a"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Household Status",
+    value: combinedFunded ? "✓ Covered" : "⚠ Shortfall",
+    color: combinedFunded ? "#1a6e42" : "#a33a3a",
+    alert: !combinedFunded ? "#a33a3a" : undefined
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "6px"
+    }
+  }, [["both", "Household View"], ["p1", p1.name || "Person 1"], ["p2", p2.name || "Person 2"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setPerson(k),
+    style: {
+      ...S.btn,
+      ...(person === k ? {
+        background: "#1a2e4a",
+        color: "#fff",
+        border: "none"
+      } : {}),
+      padding: "4px 14px"
+    }
+  }, l))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Portfolio Value Over Time"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(AreaChart, {
+    data: growthData,
+    margin: {
+      top: 4,
+      right: 4,
+      bottom: 0,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+    id: "gP1",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "5%",
+    stopColor: "#2d5a8e",
+    stopOpacity: 0.2
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "95%",
+    stopColor: "#2d5a8e",
+    stopOpacity: 0
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "gP2",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "5%",
+    stopColor: "#1a6e42",
+    stopOpacity: 0.2
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "95%",
+    stopColor: "#1a6e42",
+    stopOpacity: 0
+  }))), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "p1age",
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    interval: 4
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: v => [ff(v)],
+    labelFormatter: v => `Age ${v} (${p1.name || "P1"})`
+  })), /*#__PURE__*/React.createElement(ReferenceLine, {
+    x: p1.retirementAge,
+    stroke: "#d0dce8",
+    strokeDasharray: "4 2",
+    label: {
+      value: `${p1.name || "P1"} retires`,
+      fill: "#7a90a8",
+      fontSize: 9
+    }
+  }), (person === "both" || person === "p1") && /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "p1val",
+    stroke: "#2d5a8e",
+    fill: "url(#gP1)",
+    strokeWidth: 2,
+    dot: false,
+    name: p1.name || "Person 1"
+  }), (person === "both" || person === "p2") && /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "p2val",
+    stroke: "#1a6e42",
+    fill: "url(#gP2)",
+    strokeWidth: 2,
+    dot: false,
+    name: p2.name || "Person 2"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "16px",
+      marginTop: "5px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: "10px",
+      height: "2px",
+      background: "#2d5a8e",
+      display: "inline-block"
+    }
+  }), p1.name || "Person 1"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: "10px",
+      height: "2px",
+      background: "#1a6e42",
+      display: "inline-block"
+    }
+  }), p2.name || "Person 2"))), /*#__PURE__*/React.createElement("div", {
+    style: S.grid(2, 12)
+  }, /*#__PURE__*/React.createElement(ParamPanel, {
+    p: p1,
+    setP: setP1,
+    label: p1.name || "Person 1",
+    color: "#2d5a8e",
+    res: A1
+  }), /*#__PURE__*/React.createElement(ParamPanel, {
+    p: p2,
+    setP: setP2,
+    label: p2.name || "Person 2",
+    color: "#1a6e42",
+    res: A2
+  })), /*#__PURE__*/React.createElement("div", {
+    style: S.grid(2, 12)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Household Retirement Income"), [{
+    src: `${p1.name || "P1"} Portfolio (4%)`,
+    val: Math.round(A1.portR * 0.04 / 12),
+    c: "#2d5a8e"
+  }, {
+    src: `${p2.name || "P2"} Portfolio (4%)`,
+    val: Math.round(A2.portR * 0.04 / 12),
+    c: "#5a82b4"
+  }, {
+    src: `${p1.name || "P1"} Social Security`,
+    val: p1.socialSecurity,
+    c: "#1a6e42"
+  }, {
+    src: `${p2.name || "P2"} Social Security`,
+    val: p2.socialSecurity,
+    c: "#4a9e72"
+  }, ...(p1.vaBenefits > 0 ? [{
+    src: `${p1.name || "P1"} VA Benefits (tax-free)`,
+    val: p1.vaBenefits,
+    c: "#0f6e56"
+  }] : []), ...(p2.vaBenefits > 0 ? [{
+    src: `${p2.name || "P2"} VA Benefits (tax-free)`,
+    val: p2.vaBenefits,
+    c: "#0f6e56"
+  }] : [])].map(d => /*#__PURE__*/React.createElement("div", {
+    key: d.src,
+    style: {
+      marginBottom: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "11px",
+      marginBottom: "3px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, d.src), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#1a2e4a",
+      fontWeight: 600
+    }
+  }, ff(d.val), "/mo")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "4px",
+      borderRadius: "3px",
+      background: "#eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "100%",
+      width: `${combinedIncome > 0 ? d.val / combinedIncome * 100 : 0}%`,
+      background: d.c,
+      borderRadius: "3px"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid #d0dce8",
+      paddingTop: "8px",
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "13px",
+      fontWeight: 700,
+      marginTop: "4px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, "Total Household"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: combinedFunded ? "#1a6e42" : "#a33a3a"
+    }
+  }, ff(combinedIncome), "/mo")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: "4px",
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, "vs. target ", ff(combinedNeeded), "/mo ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: combinedFunded ? "#1a6e42" : "#a33a3a",
+      marginLeft: "6px",
+      fontWeight: 600
+    }
+  }, combinedFunded ? "✓ Covered" : "⚠ Shortfall")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: "10px",
+      padding: "8px 10px",
+      background: "#e4f4f0",
+      borderRadius: "6px",
+      borderLeft: "3px solid #0f6e56"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "11px",
+      fontWeight: 700,
+      color: "#0f6e56",
+      marginBottom: "4px"
+    }
+  }, "Healthcare Advantage \u2014 VA / CHAMPVA"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "3px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, "Pre-65 premiums (typical household)"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#a33a3a",
+      textDecoration: "line-through"
+    }
+  }, "~$2,400/mo")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, "Your cost (VA + CHAMPVA)"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#0f6e56",
+      fontWeight: 600
+    }
+  }, "~$0/mo")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, "Post-65 Medicare Part B only (\xD72)"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#0f6e56",
+      fontWeight: 600
+    }
+  }, "~$370/mo vs ~$1,200 typical")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, "Rx coverage"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#0f6e56",
+      fontWeight: 600
+    }
+  }, "Fully covered by VA")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid #9fe1cb",
+      marginTop: "4px",
+      paddingTop: "4px",
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "11px",
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#0f6e56"
+    }
+  }, "Est. lifetime healthcare savings"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#0f6e56"
+    }
+  }, "$800K\u2013$1.2M"))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "RMD Schedule \u2014 starts age ", RMD_AGE, " (SECURE 2.0)"), /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Age"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, p1.name || "Person 1"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, p2.name || "Person 2"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Combined"))), /*#__PURE__*/React.createElement("tbody", null, rmd1.map((r1, i) => {
+    const r2 = rmd2[i];
+    return /*#__PURE__*/React.createElement("tr", {
+      key: r1.age,
+      style: {
+        borderBottom: "1px solid #eef2f7"
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, "Age ", r1.age), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right",
+        color: "#c47f00",
+        fontWeight: 600
+      }
+    }, ff(r1.rmd)), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right",
+        color: "#c47f00"
+      }
+    }, r2 ? ff(r2.rmd) : "—"), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right",
+        fontWeight: 700,
+        color: "#1a2e4a"
+      }
+    }, ff(r1.rmd + (r2?.rmd || 0))));
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Roth Conversion Analysis"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8",
+      marginBottom: "7px"
+    }
+  }, "Texas \u2014 no state income tax. Federal only: 24% marginal now \u2192 est. 22% at retirement. ", p1.retirementAge - p1.currentAge, "yr horizon at ", p1.expectedReturn, "%. Converting pre-tax to Roth locks in today's rate; beneficial if future rates are higher."), /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Convert Amount"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Federal Tax Now (24%)"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Tax if Deferred (22%)"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Net Benefit"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Breakeven"))), /*#__PURE__*/React.createElement("tbody", null, rothConv.map(r => /*#__PURE__*/React.createElement("tr", {
+    key: r.amt,
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, ff(r.amt)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#c47f00"
+    }
+  }, ff(Math.round(r.taxNow))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#a33a3a"
+    }
+  }, ff(Math.round(r.taxLater))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: r.net > 0 ? "#1a6e42" : "#a33a3a",
+      fontWeight: 600
+    }
+  }, r.net > 0 ? "saves " : "", ff(Math.abs(Math.round(r.net)))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, r.net > 0 ? "Favorable now" : "Convert if rates rise"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: "8px",
+      padding: "8px 10px",
+      background: "#e8f0f9",
+      borderRadius: "6px",
+      fontSize: "10px",
+      color: "#2d5a8e"
+    }
+  }, "TX tip: No state tax means your effective conversion cost is purely federal. Consider converting during lower-income years (early retirement before SS and RMDs begin) to stay in lower brackets.")));
+}
+// ── SCENARIOS ─────────────────────────────────────────────────
+function ScenarioModule({
+  budget,
+  actuals,
+  investments
+}) {
+  const aM = computeMonthly(actuals);
+  const baseSav = aM.reduce((s, m) => s + m.savings, 0);
+  const baseNC = aM.reduce((s, m) => s + m.netCash, 0);
+  const baseTot = investments.reduce((s, r) => s + r.balance, 0);
+  const baseContrib = investments.reduce((s, r) => s + r.contribution, 0);
+  const [sliders, setSliders] = useState({
+    contrib401k: 500,
+    extraMortgage: 0,
+    discCut: 0,
+    bonusInvested: 0
+  });
+  const gR = 0.075;
+  const w5 = [1, 2, 3, 4, 5].map(yr => ({
+    year: `Y${yr}`,
+    baseline: Math.round(baseTot * Math.pow(1 + gR, yr) + baseContrib * 12 * ((Math.pow(1 + gR, yr) - 1) / gR)),
+    max401k: Math.round(baseTot * Math.pow(1 + gR, yr) + (baseContrib + sliders.contrib401k) * 12 * ((Math.pow(1 + gR, yr) - 1) / gR)),
+    custom: Math.round((baseTot + sliders.bonusInvested) * Math.pow(1 + gR, yr) + (baseContrib + sliders.contrib401k + sliders.discCut) * 12 * ((Math.pow(1 + gR, yr) - 1) / gR))
+  }));
+  const customPort5 = w5[4]?.custom || 0;
+  const basePort5 = w5[4]?.baseline || 0;
+  const addlSavings = sliders.contrib401k * 12 + sliders.bonusInvested + sliders.discCut * 12;
+  const scenarioTable = [{
+    name: "Baseline (Current)",
+    sav: baseSav,
+    delta: 0
+  }, {
+    name: `+${ff(sliders.contrib401k)}/mo 401k`,
+    sav: baseSav + sliders.contrib401k * 12,
+    delta: sliders.contrib401k * 12
+  }, {
+    name: `Cut dining 20% (~$960/yr)`,
+    sav: baseSav + 960,
+    delta: 960
+  }, {
+    name: `Invest full bonus`,
+    sav: baseSav + 15000,
+    delta: 15000
+  }, {
+    name: `All combined`,
+    sav: baseSav + sliders.contrib401k * 12 + 960 + 15000,
+    delta: sliders.contrib401k * 12 + 960 + 15000
+  }];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(3, 10)
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: "Baseline Annual Savings",
+    value: ff(baseSav),
+    color: "#1a2e4a"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Baseline 5yr Portfolio",
+    value: ff(basePort5),
+    color: "#2d5a8e"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Annual Net Cash Flow",
+    value: ff(baseNC),
+    color: baseNC >= 0 ? "#1a6e42" : "#a33a3a"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: S.grid(2, 12)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Custom What-If Model"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, [{
+    k: "contrib401k",
+    lbl: "Additional 401k Contribution (mo.)",
+    min: 0,
+    max: 2000,
+    step: 50,
+    pre: "$"
+  }, {
+    k: "extraMortgage",
+    lbl: "Extra Mortgage Payment (mo.)",
+    min: 0,
+    max: 2000,
+    step: 50,
+    pre: "$"
+  }, {
+    k: "discCut",
+    lbl: "Discretionary Spend Reduction (mo.)",
+    min: 0,
+    max: 1000,
+    step: 25,
+    pre: "$"
+  }, {
+    k: "bonusInvested",
+    lbl: "Annual Bonus Invested",
+    min: 0,
+    max: 20000,
+    step: 500,
+    pre: "$"
+  }].map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.k
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "11px",
+      marginBottom: "4px"
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, s.lbl), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#1a2e4a",
+      fontWeight: 600
+    }
+  }, s.pre, sliders[s.k].toLocaleString())), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: s.min,
+    max: s.max,
+    step: s.step,
+    value: sliders[s.k],
+    onChange: e => setSliders({
+      ...sliders,
+      [s.k]: Number(e.target.value)
+    }),
+    style: {
+      width: "100%",
+      accentColor: "#2d5a8e"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.grid(3, 8),
+      marginTop: "14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f8fafc",
+      borderRadius: "7px",
+      padding: "10px",
+      border: "1px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, "Additional Annual Savings"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "16px",
+      fontWeight: 700,
+      color: "#1a6e42",
+      marginTop: "2px"
+    }
+  }, ff(addlSavings))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f8fafc",
+      borderRadius: "7px",
+      padding: "10px",
+      border: "1px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, "5yr Portfolio (custom)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "16px",
+      fontWeight: 700,
+      color: "#6a5a9e",
+      marginTop: "2px"
+    }
+  }, ff(customPort5))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f8fafc",
+      borderRadius: "7px",
+      padding: "10px",
+      border: "1px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, "Delta vs Baseline"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "16px",
+      fontWeight: 700,
+      color: "#0f6e56",
+      marginTop: "2px"
+    }
+  }, ff(customPort5 - basePort5))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "5-Year Portfolio Comparison"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: w5,
+    margin: {
+      top: 4,
+      right: 4,
+      bottom: 0,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "year",
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: v => [ff(v)]
+  })), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: "baseline",
+    stroke: "#2d5a8e",
+    strokeWidth: 2,
+    dot: false,
+    name: "Baseline"
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: "max401k",
+    stroke: "#1a6e42",
+    strokeWidth: 2,
+    dot: false,
+    strokeDasharray: "6 3",
+    name: `+${ff(sliders.contrib401k)}/mo 401k`
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: "custom",
+    stroke: "#6a5a9e",
+    strokeWidth: 2,
+    dot: false,
+    strokeDasharray: "3 3",
+    name: "Custom Scenario"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "14px",
+      marginTop: "6px"
+    }
+  }, [["Baseline", "#2d5a8e"], ["Max 401k", "#1a6e42"], ["Custom", "#6a5a9e"]].map(([l, c]) => /*#__PURE__*/React.createElement("span", {
+    key: l,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: "10px",
+      height: "2px",
+      background: c,
+      display: "inline-block"
+    }
+  }), l))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Scenario Impact Table"), /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Scenario"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Annual Savings"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Delta vs Base"))), /*#__PURE__*/React.createElement("tbody", null, scenarioTable.map((r, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      fontSize: "11px"
+    }
+  }, r.name), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#2d5a8e",
+      fontWeight: 600
+    }
+  }, ff(r.sav)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: r.delta > 0 ? "#1a6e42" : "#7a90a8",
+      fontWeight: 600
+    }
+  }, r.delta > 0 ? "+" : "", ff(r.delta))))))))));
+}
+
+// ── YEAR-OVER-YEAR ────────────────────────────────────────────
+function YoYModule({
+  netWorthData,
+  allBudgets,
+  allActuals
+}) {
+  const hist = netWorthData.history;
+  const nwYears = [...new Set(hist.map(h => h.month.split(" ")[1]))];
+  const allTime = hist.length ? Math.max(...hist.map(h => h.netWorth)) : 0;
+  const chartData = hist.map(h => ({
+    month: h.month,
+    value: h.netWorth
+  }));
+
+  // Build income/expense/savings summary per year from actuals
+  const dataYears = Object.keys(allActuals).map(Number).sort();
+  const yearSummaries = dataYears.map(yr => {
+    const rows = allActuals[yr] || [];
+    const monthly = computeMonthly(rows);
+    const income = monthly.reduce((s, m) => s + m.income, 0);
+    const expenses = monthly.reduce((s, m) => s + m.expenses, 0);
+    const savings = monthly.reduce((s, m) => s + m.savings, 0);
+    const netCash = monthly.reduce((s, m) => s + m.netCash, 0);
+    const sr = income > 0 ? savings / income * 100 : 0;
+    const bRows = allBudgets[yr] || [];
+    const bMonthly = computeMonthly(bRows);
+    const bIncome = bMonthly.reduce((s, m) => s + m.income, 0);
+    const bExpenses = bMonthly.reduce((s, m) => s + m.expenses, 0);
+    return {
+      year: yr,
+      income,
+      expenses,
+      savings,
+      netCash,
+      sr,
+      bIncome,
+      bExpenses,
+      hasData: rows.length > 0
+    };
+  }).filter(y => y.hasData);
+  const trendData = yearSummaries.map(y => ({
+    year: String(y.year),
+    income: y.income,
+    expenses: y.expenses,
+    savings: y.savings,
+    netCash: y.netCash
+  }));
+
+  // Net worth by year
+  const nwByYear = nwYears.map(yr => {
+    const pts = hist.filter(h => h.month.includes(yr));
+    const start = pts[0]?.netWorth,
+      end = pts[pts.length - 1]?.netWorth,
+      chg = (end || 0) - (start || 0);
+    return {
+      year: yr,
+      start,
+      end,
+      chg
+    };
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, yearSummaries.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.card,
+      padding: "40px",
+      textAlign: "center",
+      color: "#7a90a8"
+    }
+  }, "No multi-year data yet. Enter actuals for at least one year to see year-over-year trends.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(Math.min(yearSummaries.length + 2, 6), 10)
+  }, yearSummaries.map(y => /*#__PURE__*/React.createElement(KPI, {
+    key: y.year,
+    label: `${y.year} Savings Rate`,
+    value: `${y.sr.toFixed(1)}%`,
+    color: y.sr >= 20 ? "#1a6e42" : "#c47f00",
+    sub: {
+      pos: y.sr >= 20,
+      text: `${ff(y.savings)} saved`
+    }
+  })), /*#__PURE__*/React.createElement(KPI, {
+    label: "All-Time NW High",
+    value: ff(allTime),
+    color: "#6a5a9e"
+  })), trendData.length > 1 && /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Income \xB7 Expenses \xB7 Savings \u2014 Year over Year"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(BarChart, {
+    data: trendData,
+    margin: {
+      top: 4,
+      right: 4,
+      bottom: 0,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "year",
+    tick: {
+      fontSize: 11,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: v => [ff(v)]
+  })), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "income",
+    fill: "#1a6e42",
+    radius: [3, 3, 0, 0],
+    name: "Income"
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "expenses",
+    fill: "#c47f00",
+    radius: [3, 3, 0, 0],
+    name: "Expenses"
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "savings",
+    fill: "#2d5a8e",
+    radius: [3, 3, 0, 0],
+    name: "Savings"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "14px",
+      marginTop: "6px"
+    }
+  }, [["Income", "#1a6e42"], ["Expenses", "#c47f00"], ["Savings", "#2d5a8e"]].map(([l, c]) => /*#__PURE__*/React.createElement("span", {
+    key: l,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      fontSize: "10px",
+      color: "#7a90a8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: "10px",
+      height: "7px",
+      background: c,
+      borderRadius: "2px",
+      display: "inline-block"
+    }
+  }), l)))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Annual Summary by Year"), /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Year"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Income"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Expenses"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Savings"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Net Cash"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Savings Rate"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "vs Budget"))), /*#__PURE__*/React.createElement("tbody", null, yearSummaries.map((y, i) => {
+    const prev = yearSummaries[i - 1];
+    const incChg = prev && prev.income > 0 ? (y.income - prev.income) / prev.income * 100 : null;
+    return /*#__PURE__*/React.createElement("tr", {
+      key: y.year,
+      style: {
+        borderBottom: "1px solid #eef2f7"
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontWeight: 700,
+        color: "#1a2e4a"
+      }
+    }, y.year), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right",
+        color: "#1a6e42",
+        fontWeight: 600
+      }
+    }, ff(y.income), incChg !== null && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: "10px",
+        color: incChg >= 0 ? "#1a6e42" : "#a33a3a",
+        marginLeft: "5px"
+      }
+    }, fp(incChg, 0))), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right",
+        color: "#c47f00"
+      }
+    }, ff(y.expenses)), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right",
+        color: "#2d5a8e",
+        fontWeight: 600
+      }
+    }, ff(y.savings)), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right",
+        color: y.netCash >= 0 ? "#1a6e42" : "#a33a3a",
+        fontWeight: 600
+      }
+    }, ff(y.netCash)), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: y.sr >= 20 ? "#1a6e42" : "#c47f00",
+        fontWeight: 600
+      }
+    }, y.sr.toFixed(1), "%")), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        textAlign: "right",
+        fontSize: "11px",
+        color: y.income >= y.bIncome ? "#1a6e42" : "#a33a3a"
+      }
+    }, y.bIncome > 0 ? `${fp((y.income - y.bIncome) / y.bIncome * 100, 0)} income` : "—"));
+  }))))), chartData.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Net Worth History"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 180
+  }, /*#__PURE__*/React.createElement(AreaChart, {
+    data: chartData,
+    margin: {
+      top: 4,
+      right: 4,
+      bottom: 0,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+    id: "gYoY",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "5%",
+    stopColor: "#2d5a8e",
+    stopOpacity: 0.2
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "95%",
+    stopColor: "#2d5a8e",
+    stopOpacity: 0
+  }))), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "month",
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    interval: 2
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 10,
+      fill: "#7a90a8"
+    },
+    axisLine: false,
+    tickLine: false,
+    tickFormatter: v => fmt(v)
+  }), /*#__PURE__*/React.createElement(Tooltip, _extends({}, TT, {
+    formatter: v => [ff(v), "Net Worth"]
+  })), /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "value",
+    stroke: "#2d5a8e",
+    fill: "url(#gYoY)",
+    strokeWidth: 2,
+    dot: false
+  }))), nwByYear.length > 0 && /*#__PURE__*/React.createElement("table", {
+    style: {
+      ...S.table,
+      marginTop: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Year"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Start NW"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "End NW"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Change"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Growth %"))), /*#__PURE__*/React.createElement("tbody", null, nwByYear.map(y => /*#__PURE__*/React.createElement("tr", {
+    key: y.year,
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, y.year), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#7a90a8"
+    }
+  }, y.start ? ff(y.start) : "—"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right"
+    }
+  }, y.end ? ff(y.end) : "—"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: y.chg >= 0 ? "#1a6e42" : "#a33a3a",
+      fontWeight: 600
+    }
+  }, ff(y.chg)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: y.chg >= 0 ? "#1a6e42" : "#a33a3a"
+    }
+  }, y.start ? fp(y.chg / y.start * 100) : "—")))))));
+}
+
+// ── TARGETS ───────────────────────────────────────────────────
+function TargetsModule({
+  targets,
+  setTargets,
+  budget,
+  actuals,
+  investments
+}) {
+  const aM = computeMonthly(actuals);
+  const cur = aM[CM];
+  const ytdI = aM.slice(0, CM + 1).reduce((s, m) => s + m.income, 0);
+  const ytdS = aM.slice(0, CM + 1).reduce((s, m) => s + m.savings, 0);
+  const sr = ytdI > 0 ? ytdS / ytdI * 100 : 0;
+  const cashBal = investments.filter(r => r.assetType === "Cash").reduce((s, r) => s + r.balance, 0);
+  const emMo = cur.expenses > 0 ? cashBal / cur.expenses : 0;
+  const retContrib = investments.filter(r => r.taxTreatment === "Pre-Tax" || r.taxTreatment === "Roth").reduce((s, r) => s + r.contribution, 0) * 12;
+  const retPct = ytdI > 0 ? retContrib / ytdI * 100 : 0;
+  const alerts = [{
+    id: 1,
+    lbl: "Savings Rate",
+    actual: sr,
+    target: targets.savingsRate,
+    unit: "%",
+    fav: sr >= targets.savingsRate,
+    note: `YTD: ${sr.toFixed(1)}% vs ${targets.savingsRate}% target`
+  }, {
+    id: 2,
+    lbl: "Emergency Fund",
+    actual: emMo,
+    target: targets.emergencyFundMonths,
+    unit: "mo",
+    fav: emMo >= targets.emergencyFundMonths,
+    note: `${emMo.toFixed(1)} months of expenses covered`
+  }, {
+    id: 3,
+    lbl: "Monthly Expenses",
+    actual: cur.expenses,
+    target: targets.maxDiscretionary,
+    unit: "$",
+    fav: cur.expenses <= targets.maxDiscretionary,
+    note: `${ff(cur.expenses)} this month vs ${ff(targets.maxDiscretionary)} cap`
+  }, {
+    id: 4,
+    lbl: "Retirement Contribution",
+    actual: retPct,
+    target: targets.retirementContribPct,
+    unit: "%",
+    fav: retPct >= targets.retirementContribPct,
+    note: `${retPct.toFixed(1)}% of income vs ${targets.retirementContribPct}% target`
+  }];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(2, 12)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Set Financial Targets"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, [{
+    k: "savingsRate",
+    lbl: "Savings Rate Target (%)",
+    min: 5,
+    max: 50,
+    step: 1,
+    disp: `${targets.savingsRate}%`
+  }, {
+    k: "emergencyFundMonths",
+    lbl: "Emergency Fund (months)",
+    min: 1,
+    max: 12,
+    step: 1,
+    disp: `${targets.emergencyFundMonths} mo`
+  }, {
+    k: "maxDiscretionary",
+    lbl: "Monthly Expense Cap ($)",
+    min: 500,
+    max: 15000,
+    step: 100,
+    disp: ff(targets.maxDiscretionary)
+  }, {
+    k: "retirementContribPct",
+    lbl: "Retirement Contribution Target (%)",
+    min: 5,
+    max: 30,
+    step: 1,
+    disp: `${targets.retirementContribPct}%`
+  }].map(t => /*#__PURE__*/React.createElement("div", {
+    key: t.k,
+    style: {
+      background: "#f8fafc",
+      borderRadius: "7px",
+      padding: "10px",
+      border: "1px solid #d0dce8"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "11px",
+      marginBottom: "5px"
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      color: "#7a90a8"
+    }
+  }, t.lbl), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#1a2e4a",
+      fontWeight: 600
+    }
+  }, t.disp)), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: t.min,
+    max: t.max,
+    step: t.step,
+    value: targets[t.k],
+    onChange: e => setTargets({
+      ...targets,
+      [t.k]: Number(e.target.value)
+    }),
+    style: {
+      width: "100%",
+      accentColor: "#2d5a8e"
+    }
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Alert Status"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px"
+    }
+  }, alerts.map(a => /*#__PURE__*/React.createElement("div", {
+    key: a.id,
+    style: {
+      background: a.fav ? "#e8f5ee" : "#faeaea",
+      borderRadius: "7px",
+      padding: "12px",
+      borderLeft: `3px solid ${a.fav ? "#1a6e42" : "#a33a3a"}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "12px",
+      fontWeight: 600,
+      color: "#1a2e4a"
+    }
+  }, a.lbl), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: "#7a90a8",
+      marginTop: "2px"
+    }
+  }, a.note)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "16px",
+      fontWeight: 700,
+      color: a.fav ? "#1a6e42" : "#a33a3a"
+    }
+  }, a.unit === "$" ? ff(Math.round(a.actual)) : `${a.actual.toFixed(1)}${a.unit}`), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "10px",
+      color: a.fav ? "#1a6e42" : "#a33a3a"
+    }
+  }, a.fav ? "✓ On target" : "⚠ Off target"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "4px",
+      borderRadius: "3px",
+      background: "#ffffff",
+      marginTop: "7px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "100%",
+      width: `${Math.min(100, a.actual / a.target * 100)}%`,
+      background: a.fav ? "#1a6e42" : "#a33a3a",
+      borderRadius: "3px"
+    }
+  }))))))));
+}
+
+// ── AUDIT LOG ─────────────────────────────────────────────────
+function AuditModule({
+  log,
+  clearLog
+}) {
+  const [fm, setFm] = useState("All");
+  const mods = ["All", ...new Set(log.map(l => l.module))];
+  const filtered = log.filter(l => fm === "All" || l.module === fm);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.grid(3, 10)
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: "Total Changes Recorded",
+    value: log.length.toLocaleString(),
+    color: "#1a2e4a"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Modules Tracked",
+    value: new Set(log.map(l => l.module)).size,
+    color: "#2d5a8e"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Most Recent Change",
+    value: log[0]?.timestamp?.split(",")[0] || "—",
+    color: "#7a90a8"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: S.card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      marginBottom: "10px",
+      gap: "6px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.secTitle
+  }, "Change Log"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "4px",
+      marginLeft: "auto",
+      flexWrap: "wrap"
+    }
+  }, mods.map(m => /*#__PURE__*/React.createElement("button", {
+    key: m,
+    onClick: () => setFm(m),
+    style: {
+      ...S.btn,
+      ...(fm === m ? {
+        background: "#2d5a8e",
+        color: "#ffffff",
+        border: "none"
+      } : {}),
+      padding: "2px 8px"
+    }
+  }, m)), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...S.btn,
+      color: "#a33a3a"
+    },
+    onClick: () => {
+      if (window.confirm("Clear audit log?")) clearLog();
+    }
+  }, "Clear"))), filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "40px",
+      textAlign: "center",
+      color: "#7a90a8",
+      fontSize: "13px"
+    }
+  }, "No changes recorded yet. Edit values in Budget, Actuals, or Net Worth to generate entries.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowY: "auto",
+      maxHeight: "500px"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Timestamp"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Module"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Field"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "Old"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...S.th,
+      textAlign: "right"
+    }
+  }, "New"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Description"))), /*#__PURE__*/React.createElement("tbody", null, filtered.map(e => /*#__PURE__*/React.createElement("tr", {
+    key: e.id,
+    style: {
+      borderBottom: "1px solid #eef2f7"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      fontSize: "10px",
+      color: "#7a90a8",
+      whiteSpace: "nowrap"
+    }
+  }, e.timestamp), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("span", {
+    style: S.badge("#2d5a8e")
+  }, e.module)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      fontSize: "11px"
+    }
+  }, e.field), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#a33a3a",
+      fontSize: "11px"
+    }
+  }, e.oldVal), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      textAlign: "right",
+      color: "#1a6e42",
+      fontSize: "11px",
+      fontWeight: 600
+    }
+  }, e.newVal), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      fontSize: "11px",
+      color: "#7a90a8"
+    }
+  }, e.description))))))));
+}
+
+// ── ROOT APP ──────────────────────────────────────────────────
+const TABS = [{
+  id: "overview",
+  label: "Overview"
+}, {
+  id: "budget",
+  label: "Budget Setup"
+}, {
+  id: "actuals",
+  label: "Actuals Entry"
+}, {
+  id: "variance",
+  label: "Variance"
+}, {
+  id: "networth",
+  label: "Net Worth"
+}, {
+  id: "investments",
+  label: "Investments"
+}, {
+  id: "retirement",
+  label: "Retirement"
+}, {
+  id: "scenarios",
+  label: "Scenarios"
+}, {
+  id: "yoy",
+  label: "Year-over-Year"
+}, {
+  id: "targets",
+  label: "Targets"
+}, {
+  id: "auditlog",
+  label: "Audit Log"
+}];
+const YEARS = [2026, 2027, 2028, 2029, 2030, 2031];
+const CUR_YEAR = 2026;
+
+// Multi-year storage: {2026: [...rows], 2027: [...rows], ...}
+const DEFAULT_BUDGETS = {
+  2026: DB
+};
+const DEFAULT_ACTUALS = {
+  2026: DA
+};
+function App() {
+  const [tab, setTab] = useState("overview");
+  const [activeYear, setActiveYear] = useState(CUR_YEAR);
+  const [allBudgets, setAllBudgets] = useLS("fincc_budgets_v4", DEFAULT_BUDGETS);
+  const [allActuals, setAllActuals] = useLS("fincc_actuals_v4", DEFAULT_ACTUALS);
+  const [investments, setInvestments] = useLS("fincc_investments_v2", DI);
+  const [netWorthData, setNetWorthData] = useLS("fincc_networth_v2", DNW);
+  const [targets, setTargets] = useLS("fincc_targets_v2", DT);
+  const [saveSt, setSaveSt] = useState("All changes saved");
+  const [log, addAudit, clearLog] = useAuditLog();
+  const debRef = useRef(null);
+
+  // Current year's budget and actuals
+  const budget = allBudgets[activeYear] || [];
+  const actuals = allActuals[activeYear] || [];
+  const setBudget = useCallback(updater => {
+    setAllBudgets(prev => {
+      const cur = prev[activeYear] || [];
+      const next = typeof updater === "function" ? updater(cur) : updater;
+      return {
+        ...prev,
+        [activeYear]: next
+      };
+    });
+  }, [activeYear, setAllBudgets]);
+  const setActuals = useCallback(updater => {
+    setAllActuals(prev => {
+      const cur = prev[activeYear] || [];
+      const next = typeof updater === "function" ? updater(cur) : updater;
+      return {
+        ...prev,
+        [activeYear]: next
+      };
+    });
+  }, [activeYear, setAllActuals]);
+
+  // Copy prior year's budget as template for a new year
+  const copyBudgetFromYear = (fromYear, toYear) => {
+    const source = allBudgets[fromYear] || [];
+    const newBudget = source.map(r => ({
+      ...r,
+      id: Date.now() + Math.random(),
+      months: Object.fromEntries(MONTHS.map(m => [m, r.months[m] || 0]))
+    }));
+    const newActuals = newBudget.map(r => ({
+      ...r,
+      id: Date.now() + Math.random(),
+      months: Object.fromEntries(MONTHS.map(m => [m, 0]))
+    }));
+    setAllBudgets(prev => ({
+      ...prev,
+      [toYear]: newBudget
+    }));
+    setAllActuals(prev => ({
+      ...prev,
+      [toYear]: newActuals
+    }));
+  };
+  useEffect(() => {
+    setSaveSt("Saving…");
+    clearTimeout(debRef.current);
+    debRef.current = setTimeout(() => setSaveSt("All changes saved"), 700);
+  }, [allBudgets, allActuals, investments, netWorthData, targets]);
+  const [showExport, setShowExport] = useState(false);
+  const exportData = () => setShowExport(true);
+  const exportJson = JSON.stringify({
+    allBudgets,
+    allActuals,
+    investments,
+    netWorthData,
+    targets,
+    log
+  }, null, 2);
+  const importData = () => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = ".json";
+    inp.onchange = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        try {
+          const d = JSON.parse(ev.target.result);
+          // Support both old single-year and new multi-year format
+          if (d.allBudgets) setAllBudgets(d.allBudgets);else if (d.budget) setAllBudgets({
+            [CUR_YEAR]: d.budget
+          });
+          if (d.allActuals) setAllActuals(d.allActuals);else if (d.actuals) setAllActuals({
+            [CUR_YEAR]: d.actuals
+          });
+          if (d.investments) setInvestments(d.investments);
+          if (d.netWorthData) setNetWorthData(d.netWorthData);
+          if (d.targets) setTargets(d.targets);
+        } catch {
+          alert("Invalid file format.");
+        }
+      };
+      r.readAsText(f);
+    };
+    inp.click();
+  };
+
+  // Year selector component used across tabs
+  const YearBar = ({
+    showCopy = false
+  }) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      marginBottom: "12px",
+      padding: "8px 14px",
+      background: "#ffffff",
+      border: "1px solid #d0dce8",
+      borderRadius: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "11px",
+      fontWeight: 700,
+      color: "#7a90a8",
+      textTransform: "uppercase",
+      letterSpacing: "0.5px",
+      marginRight: "4px"
+    }
+  }, "Year"), YEARS.map(y => /*#__PURE__*/React.createElement("button", {
+    key: y,
+    onClick: () => setActiveYear(y),
+    style: {
+      ...S.btn,
+      ...(activeYear === y ? {
+        background: "#1a2e4a",
+        color: "#ffffff",
+        border: "none"
+      } : {}),
+      padding: "3px 12px",
+      fontWeight: activeYear === y ? 700 : 500
+    }
+  }, y, (allBudgets[y] || []).length > 0 && y !== activeYear && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: "4px",
+      fontSize: "9px",
+      color: activeYear === y ? "#8aaac8" : "#a8bcd0"
+    }
+  }, "\u2713"))), showCopy && activeYear > YEARS[0] && !(allBudgets[activeYear] || []).length && /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...S.btn,
+      marginLeft: "8px",
+      color: "#0f6e56",
+      borderColor: "#0f6e56"
+    },
+    onClick: () => {
+      if (window.confirm(`Copy ${activeYear - 1} budget as a starting template for ${activeYear}?`)) copyBudgetFromYear(activeYear - 1, activeYear);
+    }
+  }, "\u27F3 Copy from ", activeYear - 1), showCopy && (allBudgets[activeYear] || []).length === 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "11px",
+      color: "#a8bcd0",
+      marginLeft: "6px"
+    }
+  }, "No data yet for ", activeYear), showCopy && (allBudgets[activeYear] || []).length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "11px",
+      color: "#7a90a8",
+      marginLeft: "6px"
+    }
+  }, (allBudgets[activeYear] || []).length, " budget rows"));
+  return /*#__PURE__*/React.createElement("div", {
+    style: S.app
+  }, /*#__PURE__*/React.createElement("link", {
+    href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap",
+    rel: "stylesheet"
+  }), showExport && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.7)",
+      zIndex: 9999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#ffffff",
+      borderRadius: "12px",
+      padding: "24px",
+      width: "80%",
+      maxWidth: "700px",
+      maxHeight: "80vh",
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "15px",
+      fontWeight: 700,
+      color: "#1a2e4a"
+    }
+  }, "Export Your Data"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowExport(false),
+    style: {
+      ...S.btnD,
+      fontSize: "16px"
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: "12px",
+      color: "#7a90a8",
+      background: "#e8f0f9",
+      padding: "10px 12px",
+      borderRadius: "7px"
+    }
+  }, "Press ", /*#__PURE__*/React.createElement("strong", null, "Ctrl+A"), " to select all, then ", /*#__PURE__*/React.createElement("strong", null, "Ctrl+C"), " to copy. Paste into Notepad and save as ", /*#__PURE__*/React.createElement("strong", null, "fincommand-backup.json"), " (save type: All Files)."), /*#__PURE__*/React.createElement("textarea", {
+    readOnly: true,
+    value: exportJson,
+    onFocus: e => {
+      e.target.select();
+    },
+    style: {
+      flex: 1,
+      minHeight: "300px",
+      fontFamily: "monospace",
+      fontSize: "11px",
+      padding: "10px",
+      border: "1px solid #d0dce8",
+      borderRadius: "7px",
+      background: "#f8fafc",
+      color: "#1a2e4a",
+      resize: "none"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: "8px",
+      justifyContent: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: S.btn,
+    onClick: () => setShowExport(false)
+  }, "Close"), /*#__PURE__*/React.createElement("button", {
+    style: S.btnP,
+    onClick: () => {
+      const ta = document.querySelector("textarea[readonly]");
+      if (ta) {
+        ta.select();
+        document.execCommand("copy");
+        alert("Copied! Now paste into Notepad and save as fincommand-backup.json");
+      }
+    }
+  }, "Copy All")))), /*#__PURE__*/React.createElement("nav", {
+    style: S.nav
+  }, /*#__PURE__*/React.createElement("span", {
+    style: S.navTitle
+  }, "FinCommand"), TABS.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.id,
+    style: S.navBtn(tab === t.id),
+    onClick: () => setTab(t.id)
+  }, t.label)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: "7px",
+      marginLeft: "auto",
+      paddingLeft: "10px",
+      flexShrink: 0
+    }
+  }, log.length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      color: "#c47f00",
+      background: "#c47f0018",
+      padding: "1px 6px",
+      borderRadius: "4px",
+      whiteSpace: "nowrap"
+    }
+  }, log.length, " changes"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: "10px",
+      color: "#8aaac8",
+      whiteSpace: "nowrap"
+    }
+  }, saveSt), /*#__PURE__*/React.createElement("button", {
+    style: S.btn,
+    onClick: importData
+  }, "Import"), /*#__PURE__*/React.createElement("button", {
+    style: S.btn,
+    onClick: exportData
+  }, "Export"))), /*#__PURE__*/React.createElement("div", {
+    style: S.content
+  }, tab === "overview" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(YearBar, null), /*#__PURE__*/React.createElement(OverviewModule, {
+    budget: budget,
+    actuals: actuals,
+    netWorthData: netWorthData,
+    targets: targets,
+    investments: investments,
+    year: activeYear
+  })), tab === "budget" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(YearBar, {
+    showCopy: true
+  }), /*#__PURE__*/React.createElement(BudgetModule, {
+    rows: budget,
+    setRows: setBudget,
+    actuals: actuals,
+    setActuals: setActuals,
+    audit: addAudit
+  })), tab === "actuals" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(YearBar, null), /*#__PURE__*/React.createElement(ActualsModule, {
+    budget: budget,
+    actuals: actuals,
+    setActuals: setActuals,
+    audit: addAudit
+  })), tab === "variance" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(YearBar, null), /*#__PURE__*/React.createElement(VarianceModule, {
+    budget: budget,
+    actuals: actuals
+  })), tab === "networth" && /*#__PURE__*/React.createElement(NetWorthModule, {
+    data: netWorthData,
+    setData: setNetWorthData,
+    investments: investments,
+    audit: addAudit
+  }), tab === "investments" && /*#__PURE__*/React.createElement(InvestmentsModule, {
+    investments: investments,
+    setInvestments: setInvestments
+  }), tab === "retirement" && /*#__PURE__*/React.createElement(RetirementModule, {
+    investments: investments
+  }), tab === "scenarios" && /*#__PURE__*/React.createElement(ScenarioModule, {
+    budget: budget,
+    actuals: actuals,
+    investments: investments
+  }), tab === "yoy" && /*#__PURE__*/React.createElement(YoYModule, {
+    netWorthData: netWorthData,
+    allBudgets: allBudgets,
+    allActuals: allActuals
+  }), tab === "targets" && /*#__PURE__*/React.createElement(TargetsModule, {
+    targets: targets,
+    setTargets: setTargets,
+    budget: budget,
+    actuals: actuals,
+    investments: investments
+  }), tab === "auditlog" && /*#__PURE__*/React.createElement(AuditModule, {
+    log: log,
+    clearLog: clearLog
+  })));
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  </script>
+</body>
+</html>
